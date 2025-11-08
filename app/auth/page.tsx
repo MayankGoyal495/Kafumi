@@ -78,7 +78,7 @@ export default function AuthPage() {
       <div className="w-full max-w-md space-y-6 md:space-y-8">
         {/* Logo and Branding */}
         <div className="text-center space-y-3 md:space-y-4">
-          <Logo className="justify-center" />
+          <Logo className="justify-center" clickable={false} />
           <p className="text-muted-foreground text-base md:text-lg px-4">Welcome to your perfect café experience</p>
         </div>
 

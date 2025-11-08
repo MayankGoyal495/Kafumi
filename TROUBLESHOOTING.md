@@ -34,7 +34,7 @@ Search button doesn't do anything, or page freezes
 #### Solution 1: Check API Keys
 ```bash
 # Verify .env.local exists
-cat /Users/mayankgoyal/Desktop/Koffista/3.Koffista/.env.local
+cat /Users/mayankgoyal/Desktop/Kafumi/3.Kafumi/.env.local
 
 # Should show:
 NEXT_PUBLIC_LOCATIONIQ_KEY=pk.cf96657abd995a24465b0c5de034a904
@@ -45,7 +45,7 @@ NEXT_PUBLIC_OPENCAGE_KEY=323e8db1b0154a0e84d421ad3ce79299
 ```bash
 # Stop the server (Ctrl+C)
 # Then restart
-cd /Users/mayankgoyal/Desktop/Koffista/3.Koffista
+cd /Users/mayankgoyal/Desktop/Kafumi/3.Kafumi
 npm run dev
 ```
 

@@ -1,4 +1,4 @@
-import { cafes } from "@/lib/cafe-data"
+import { getCafes } from "@/lib/cafe-data-service"
 import type { Cafe } from "@/lib/types"
 import { getDistanceKm } from "@/lib/distance"
 import { formatKm } from "@/lib/geocoding"
@@ -64,7 +64,19 @@ export interface MatchResultItem {
   distanceProximity: 'within' | 'next' | 'beyond' | 'unknown'
 }
 
+/**
+ * Updated match percentage weights:
+ * - Mood: 20%
+ * - Ambience: 11%
+ * - Amenities: 9%
+ * - Food & Drinks: 12%
+ * - Price: 12%
+ * - Dishes: 12%
+ * - Rating: 11%
+ * - Promoter Rating: 13%
+ */
 export async function computeCafeMatches(preferences: UserMatchPreferences): Promise<MatchResultItem[]> {
+  const cafes = await getCafes()
   const results: MatchResultItem[] = []
 
   for (const cafe of cafes as Cafe[]) {
@@ -79,40 +91,53 @@ export async function computeCafeMatches(preferences: UserMatchPreferences): Pro
     const matchedMood = !!(preferences.preferredMood && cafe.purpose?.includes(preferences.preferredMood))
     if (matchedMood) total += 20
 
-    // Ambience (vibe) — 12%
+    // Ambience (vibe) — 11%
     let matchedAmbience: string[] = []
     if (Array.isArray(preferences.preferredAmbience) && preferences.preferredAmbience.length > 0) {
       matchedAmbience = preferences.preferredAmbience.filter((a) => cafe.vibe.includes(a))
-      total += (matchedAmbience.length / preferences.preferredAmbience.length) * 12
+      total += (matchedAmbience.length / preferences.preferredAmbience.length) * 11
     }
 
-    // Amenities — 10%
+    // Amenities — 9%
     let matchedAmenities: string[] = []
     if (Array.isArray(preferences.preferredAmenities) && preferences.preferredAmenities.length > 0) {
       matchedAmenities = preferences.preferredAmenities.filter((a) => cafe.amenities.includes(a))
-      total += (matchedAmenities.length / preferences.preferredAmenities.length) * 10
+      total += (matchedAmenities.length / preferences.preferredAmenities.length) * 9
     }
 
-    // Food & Drinks — 15%
+    // Food & Drinks — 12%
     let matchedFoodDrinkTypes: string[] = []
     if (Array.isArray(preferences.preferredFoodDrinkTypes) && preferences.preferredFoodDrinkTypes.length > 0) {
       const cafeFdt = cafe.foodDrinkTypes ?? []
       matchedFoodDrinkTypes = preferences.preferredFoodDrinkTypes.filter((f) => cafeFdt.includes(f))
-      total += (matchedFoodDrinkTypes.length / preferences.preferredFoodDrinkTypes.length) * 15
+      total += (matchedFoodDrinkTypes.length / preferences.preferredFoodDrinkTypes.length) * 12
     }
 
-    // Price — 15% using bucket distance
+    // Price — 12% using bucket distance
     let priceProximity: 'exact' | 'one' | 'two' | 'none' = 'none'
     if (preferences.preferredPriceRange) {
       const userIdx = bucketIndex(priceOrder, preferences.preferredPriceRange)
       const cafeIdx = bucketIndex(priceOrder, cafe.priceRange)
       const diff = Math.abs(cafeIdx - userIdx)
-      if (diff === 0) { total += 15; priceProximity = 'exact' }
-      else if (diff === 1) { total += 7.5; priceProximity = 'one' }
-      else if (diff === 2) { total += 3.75; priceProximity = 'two' }
+      if (diff === 0) { total += 12; priceProximity = 'exact' }
+      else if (diff === 1) { total += 6; priceProximity = 'one' }
+      else if (diff === 2) { total += 3; priceProximity = 'two' }
     }
 
-    // Distance — 15%
+    // Dishes — 12% (based on best dish match)
+    if (cafe.bestDish) {
+      total += 12
+    }
+
+    // Rating — 11%
+    total += (cafe.rating / 5) * 11
+
+    // Promoter Rating — 13%
+    if (cafe.promoterRating) {
+      total += (cafe.promoterRating / 10) * 13
+    }
+    
+    // Distance is not in the new weights, but we still calculate it for display
     let distanceLabel = "N/A"
     let distanceProximity: 'within' | 'next' | 'beyond' | 'unknown' = 'unknown'
     if (preferences.userCoords) {
@@ -124,16 +149,13 @@ export async function computeCafeMatches(preferences: UserMatchPreferences): Pro
           preferences.maxDistance,
         )
         const cafeBucketIdx = getDistanceBucketIndex(km)
-        if (cafeBucketIdx <= userBucketIdx) { total += 15; distanceProximity = 'within' }
-        else if (cafeBucketIdx === userBucketIdx + 1) { total += 7.5; distanceProximity = 'next' }
+        if (cafeBucketIdx <= userBucketIdx) { distanceProximity = 'within' }
+        else if (cafeBucketIdx === userBucketIdx + 1) { distanceProximity = 'next' }
         else { distanceProximity = 'beyond' }
       } catch {
         // ignore
       }
     }
-
-    // Rating — 13%
-    total += (cafe.rating / 5) * 13
 
     // Clamp and push
     const matchPercentage = Math.max(0, Math.min(100, Math.round(total)))
@@ -154,5 +176,3 @@ export async function computeCafeMatches(preferences: UserMatchPreferences): Pro
 
   return results.sort((a, b) => b.matchPercentage - a.matchPercentage)
 }
-
-

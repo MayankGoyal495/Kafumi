@@ -6,6 +6,7 @@ export interface Cafe {
   shortDescription: string
   rating: number
   reviewCount: number
+  promoterRating?: number // 0-10 scale, added for new matching system
   image: string
   images: string[]
   vibe: string[]
@@ -27,6 +28,7 @@ export interface Cafe {
     phone: string
     email?: string
     website?: string
+    googleMapsLink?: string
     social?: {
       instagram?: string
       facebook?: string

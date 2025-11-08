@@ -2,7 +2,7 @@
 
 ## ✨ What's New
 
-We've significantly enhanced the location search functionality in Koffista with a comprehensive, multi-API geocoding system and improved user experience.
+We've significantly enhanced the location search functionality in Kafumi with a comprehensive, multi-API geocoding system and improved user experience.
 
 ## 🚀 Key Improvements
 

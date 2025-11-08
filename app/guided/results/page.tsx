@@ -13,13 +13,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { cafes } from "@/lib/cafe-data"
+import { getCafes } from "@/lib/cafe-data-service"
+import type { Cafe } from "@/lib/types"
 import { computeCafeMatches, type UserMatchPreferences } from "@/lib/match"
 import { Sparkles, RotateCcw, Star, MapPin, Lock, ArrowRight } from "lucide-react"
 
 export default function GuidedResultsPage() {
   const router = useRouter()
-  const [recommendedCafes, setRecommendedCafes] = useState(cafes)
+  const [recommendedCafes, setRecommendedCafes] = useState<Cafe[]>([])
   const [matchesCount, setMatchesCount] = useState(0)
   const [matchMap, setMatchMap] = useState<Record<string, number>>({})
   const [featuresMap, setFeaturesMap] = useState<Record<string, { ambience: string[]; amenities: string[]; fdt: string[]; mood: boolean }>>({})
@@ -28,50 +29,58 @@ export default function GuidedResultsPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   useEffect(() => {
-    const savedLocation = localStorage.getItem("userLocation")
-    if (savedLocation) setLocation(savedLocation)
+    const initData = async () => {
+      const savedLocation = localStorage.getItem("userLocation")
+      if (savedLocation) setLocation(savedLocation)
 
-    const savedFavorites = localStorage.getItem("favorites")
-    if (savedFavorites) setFavorites(JSON.parse(savedFavorites))
-    
-    const authToken = localStorage.getItem("authToken")
-    const user = localStorage.getItem("user")
-    setIsLoggedIn(!!(authToken || user))
+      const savedFavorites = localStorage.getItem("favorites")
+      if (savedFavorites) setFavorites(JSON.parse(savedFavorites))
+      
+      const authToken = localStorage.getItem("authToken")
+      const user = localStorage.getItem("user")
+      setIsLoggedIn(!!(authToken || user))
 
-    // In a real app, would filter based on preferences
-    const preferences = localStorage.getItem("guidedSearchPreferences")
-    const savedCoords = localStorage.getItem("userCoords")
-    if (preferences) {
-      const parsed = JSON.parse(preferences)
-      const userPrefs: UserMatchPreferences = {
-        preferredMood: parsed[1] || "",
-        preferredAmbience: parsed[2] || [],
-        preferredAmenities: parsed[3] || [],
-        preferredFoodDrinkTypes: parsed[4] || [],
-        // Map price range (question 6 in guided) to our price buckets if present
-        preferredPriceRange: parsed[6] || "",
-        // Distance bucket (question 5)
-        maxDistance: parsed[5] || "Anywhere 12km+",
-        minRating: 0,
-        userCoords: savedCoords ? JSON.parse(savedCoords) : undefined,
-      }
-      computeCafeMatches(userPrefs).then((results) => {
-        // Merge match % into cafe cards by ordering cafe list accordingly
-        const ordered = [...cafes].sort((a, b) => {
-          const aScore = results.find((r) => r.name === a.name)?.matchPercentage ?? 0
-          const bScore = results.find((r) => r.name === b.name)?.matchPercentage ?? 0
-          return bScore - aScore
+      // Fetch cafes from Google Sheets
+      const cafes = await getCafes()
+
+      // In a real app, would filter based on preferences
+      const preferences = localStorage.getItem("guidedSearchPreferences")
+      const savedCoords = localStorage.getItem("userCoords")
+      if (preferences) {
+        const parsed = JSON.parse(preferences)
+        const userPrefs: UserMatchPreferences = {
+          preferredMood: parsed[1] || "",
+          preferredAmbience: parsed[2] || [],
+          preferredAmenities: parsed[3] || [],
+          preferredFoodDrinkTypes: parsed[4] || [],
+          // Map price range (question 6 in guided) to our price buckets if present
+          preferredPriceRange: parsed[6] || "",
+          // Distance bucket (question 5)
+          maxDistance: parsed[5] || "Anywhere 12km+",
+          minRating: 0,
+          userCoords: savedCoords ? JSON.parse(savedCoords) : undefined,
+        }
+        computeCafeMatches(userPrefs).then((results) => {
+          // Merge match % into cafe cards by ordering cafe list accordingly
+          const ordered = [...cafes].sort((a, b) => {
+            const aScore = results.find((r) => r.name === a.name)?.matchPercentage ?? 0
+            const bScore = results.find((r) => r.name === b.name)?.matchPercentage ?? 0
+            return bScore - aScore
+          })
+          setMatchesCount(results.length)
+          setMatchMap(Object.fromEntries(results.map((r) => [r.name, r.matchPercentage])))
+          setFeaturesMap(
+            Object.fromEntries(
+              results.map((r) => [r.name, { ambience: r.matchedAmbience, amenities: r.matchedAmenities, fdt: r.matchedFoodDrinkTypes, mood: r.matchedMood }]),
+            ),
+          )
+          setRecommendedCafes(ordered)
         })
-        setMatchesCount(results.length)
-        setMatchMap(Object.fromEntries(results.map((r) => [r.name, r.matchPercentage])))
-        setFeaturesMap(
-          Object.fromEntries(
-            results.map((r) => [r.name, { ambience: r.matchedAmbience, amenities: r.matchedAmenities, fdt: r.matchedFoodDrinkTypes, mood: r.matchedMood }]),
-          ),
-        )
-        setRecommendedCafes(ordered)
-      })
+      } else {
+        setRecommendedCafes(cafes)
+      }
     }
+    initData()
   }, [])
 
   const toggleFavorite = (cafeId: string) => {
@@ -427,14 +436,31 @@ export default function GuidedResultsPage() {
                           </div>
                         )}
                         <Link href={`/cafe/${cafe.id}`}>
-                          <div className="relative h-48 md:h-52 w-full overflow-hidden -mb-2">
-                            <Image 
-                              src={cafe.image || "/placeholder.svg"} 
-                              alt={cafe.name} 
-                              fill 
-                              className="object-cover group-hover:scale-105 transition-transform duration-300" 
-                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                            />
+                          <div className="relative h-48 md:h-52 w-full overflow-hidden -mb-2 bg-muted">
+                            {(() => {
+                              let imageSrc = !cafe.image || cafe.image.trim() === '' || cafe.image.includes('placeholder')
+                                ? '/placeholder.jpg'
+                                : cafe.image;
+                              
+                              // Use proxy for Google Drive URLs
+                              if (imageSrc.includes('drive.google.com') && imageSrc !== '/placeholder.jpg') {
+                                imageSrc = `/api/proxy-image?url=${encodeURIComponent(imageSrc)}`;
+                              }
+                              
+                              return (
+                                <img
+                                  src={imageSrc}
+                                  alt={cafe.name}
+                                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  onError={(e) => {
+                                    if (e.currentTarget.src !== window.location.origin + '/placeholder.jpg') {
+                                      e.currentTarget.src = '/placeholder.jpg';
+                                    }
+                                  }}
+                                />
+                              );
+                            })()}
                             {cafe.type === 'Veg' && (
                               <div className="absolute top-3 right-3 px-2.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-300 shadow-md">
                                 <span className="text-emerald-600">●</span>

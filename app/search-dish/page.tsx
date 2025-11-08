@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { cafes } from "@/lib/cafe-data"
+import { getCafes } from "@/lib/cafe-data-service"
+import type { Cafe } from "@/lib/types"
 import { getDistanceKm } from "@/lib/distance"
 import { Search, SlidersHorizontal, X, Utensils, MapPin, DollarSign, Star } from "lucide-react"
 import { PageLoading, CardLoading } from "@/components/loading"
@@ -31,7 +32,7 @@ import {
 } from "@/components/ui/select"
 
 interface DishSearchResult {
-  cafe: typeof cafes[0]
+  cafe: Cafe
   matchingItems: Array<{
     category: string
     item: {
@@ -74,7 +75,7 @@ function fuzzySearch(query: string, text: string): number {
   return score
 }
 
-function generateDishSuggestions(): string[] {
+function generateDishSuggestions(cafes: Cafe[]): string[] {
   const suggestions = new Set<string>()
   
   cafes.forEach(cafe => {
@@ -91,6 +92,7 @@ function generateDishSuggestions(): string[] {
 export default function SearchDishPage() {
   const router = useRouter()
   
+  const [cafes, setCafes] = useState<Cafe[]>([])
   const [dishQuery, setDishQuery] = useState("")
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -110,7 +112,7 @@ export default function SearchDishPage() {
   const [selectedVibes, setSelectedVibes] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<string>("relevance")
   
-  const allDishSuggestions = useMemo(() => generateDishSuggestions(), [])
+  const allDishSuggestions = useMemo(() => generateDishSuggestions(cafes), [cafes])
   
   const priceRangeOptions = [
     { value: "budget", label: "₹ (Budget)" },
@@ -155,6 +157,10 @@ export default function SearchDishPage() {
         }
         const savedFavorites = localStorage.getItem("favorites")
         if (savedFavorites) setFavorites(JSON.parse(savedFavorites))
+        
+        // Fetch cafes from Google Sheets
+        const fetchedCafes = await getCafes()
+        setCafes(fetchedCafes)
       } catch (error) {
         console.error('Error loading data:', error)
       } finally {

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Koffista uses a comprehensive, multi-tier geocoding system with 7 different APIs to ensure maximum location search accuracy and reliability. The system automatically falls back through multiple services if one fails, providing robust location search capabilities.
+Kafumi uses a comprehensive, multi-tier geocoding system with 7 different APIs to ensure maximum location search accuracy and reliability. The system automatically falls back through multiple services if one fails, providing robust location search capabilities.
 
 ## 🎯 Supported APIs
 

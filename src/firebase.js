@@ -9,9 +9,9 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyA04-h6SKDOKE55ZAeRO-mUwMpDqLwcdas",
-  authDomain: "koffista-b3d94.firebaseapp.com",
-  projectId: "koffista-b3d94",
-  storageBucket: "koffista-b3d94.firebasestorage.app",
+  authDomain: "Kafumi-b3d94.firebaseapp.com",
+  projectId: "Kafumi-b3d94",
+  storageBucket: "Kafumi-b3d94.firebasestorage.app",
   messagingSenderId: "411704539005",
   appId: "1:411704539005:web:5ab3f27d3e1a9ad9553e14",
   measurementId: "G-3Q46NB7TYB"

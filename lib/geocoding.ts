@@ -1,5 +1,5 @@
 // ============================================================================
-// IMPROVED GEOCODING SYSTEM WITH CACHING, TIMEOUTS, AND BETTER ERROR HANDLING
+// IMPROVED GEOCODING SYSTEM WITH INDIA FILTERS, PERSISTENT CACHE & BETTER ERROR HANDLING
 // ============================================================================
 
 // Types
@@ -28,20 +28,147 @@ const API_KEYS = {
 };
 
 const CONFIG = {
-  CACHE_DURATION: 30 * 60 * 1000, // 30 minutes (increased from 5)
-  API_TIMEOUT: 15000, // 15 seconds (increased from 8)
-  MAX_RETRIES: 2, // Retry failed requests
-  RETRY_DELAY: 1000, // 1 second between retries
+  CACHE_DURATION: 30 * 60 * 1000, // 30 minutes
+  API_TIMEOUT: 15000, // 15 seconds
+  MAX_RETRIES: 2,
+  RETRY_DELAY: 1000,
   MIN_QUERY_LENGTH: 2,
-  USER_AGENT: 'Koffista-Cafe-Discovery/2.0 (contact@koffista.com)',
-  DEBOUNCE_DELAY: 500, // Debounce search requests
+  USER_AGENT: 'Kafumi-Cafe-Discovery/2.0 (contact@Kafumi.com)',
+  DEBOUNCE_DELAY: 500,
+  // India center coordinates for location bias
+  INDIA_CENTER_LAT: 20.5937,
+  INDIA_CENTER_LNG: 78.9629,
+  // Cache keys for localStorage
+  CACHE_STORAGE_KEY: 'Kafumi_location_cache',
+  RATE_LIMIT_STORAGE_KEY: 'Kafumi_rate_limits',
+  MAX_CACHE_ENTRIES: 50,
 };
 
-// Simple in-memory cache
-const searchCache = new Map<string, CachedResult>();
+// ============================================================================
+// PERSISTENT CACHE MANAGEMENT
+// ============================================================================
 
-// Rate limiting tracking
-const rateLimitTracker = new Map<string, { count: number; resetTime: number }>();
+function getCachedResults(query: string): GeocodingResult[] | null {
+  if (typeof window === 'undefined') return null;
+  
+  try {
+    const normalizedQuery = normalizeQuery(query);
+    const cacheStr = localStorage.getItem(CONFIG.CACHE_STORAGE_KEY);
+    if (!cacheStr) return null;
+    
+    const cache: Record<string, CachedResult> = JSON.parse(cacheStr);
+    const cached = cache[normalizedQuery];
+    
+    if (cached && Date.now() - cached.timestamp < CONFIG.CACHE_DURATION) {
+      console.log(`✨ Using cached results for: "${query}"`);
+      return cached.data;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error reading cache:', error);
+    return null;
+  }
+}
+
+function setCachedResults(query: string, results: GeocodingResult[]): void {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const normalizedQuery = normalizeQuery(query);
+    const cacheStr = localStorage.getItem(CONFIG.CACHE_STORAGE_KEY);
+    const cache: Record<string, CachedResult> = cacheStr ? JSON.parse(cacheStr) : {};
+    
+    cache[normalizedQuery] = {
+      data: results,
+      timestamp: Date.now(),
+    };
+    
+    // Keep only the most recent entries
+    const entries = Object.entries(cache);
+    if (entries.length > CONFIG.MAX_CACHE_ENTRIES) {
+      const sorted = entries.sort((a, b) => b[1].timestamp - a[1].timestamp);
+      const limited = Object.fromEntries(sorted.slice(0, CONFIG.MAX_CACHE_ENTRIES));
+      localStorage.setItem(CONFIG.CACHE_STORAGE_KEY, JSON.stringify(limited));
+    } else {
+      localStorage.setItem(CONFIG.CACHE_STORAGE_KEY, JSON.stringify(cache));
+    }
+  } catch (error) {
+    console.error('Error setting cache:', error);
+  }
+}
+
+// ============================================================================
+// PERSISTENT RATE LIMITING
+// ============================================================================
+
+type RateLimitData = {
+  count: number;
+  resetTime: number;
+};
+
+function getRateLimitData(): Map<string, RateLimitData> {
+  if (typeof window === 'undefined') return new Map();
+  
+  try {
+    const stored = localStorage.getItem(CONFIG.RATE_LIMIT_STORAGE_KEY);
+    if (!stored) return new Map();
+    
+    const data = JSON.parse(stored);
+    const now = Date.now();
+    
+    // Clean expired entries
+    const filtered = Object.entries(data).filter(
+      ([_, value]: any) => now < value.resetTime
+    );
+    
+    return new Map(filtered as [string, RateLimitData][]);
+  } catch (error) {
+    console.error('Error reading rate limits:', error);
+    return new Map();
+  }
+}
+
+function saveRateLimitData(limits: Map<string, RateLimitData>): void {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const obj = Object.fromEntries(limits);
+    localStorage.setItem(CONFIG.RATE_LIMIT_STORAGE_KEY, JSON.stringify(obj));
+  } catch (error) {
+    console.error('Error saving rate limits:', error);
+  }
+}
+
+function isRateLimited(apiName: string): boolean {
+  const limits = getRateLimitData();
+  const tracker = limits.get(apiName);
+  
+  if (!tracker) return false;
+  
+  if (Date.now() < tracker.resetTime) {
+    return tracker.count >= 5; // Max 5 requests per minute per API
+  }
+  
+  return false;
+}
+
+function incrementRateLimit(apiName: string): void {
+  const limits = getRateLimitData();
+  const tracker = limits.get(apiName);
+  const now = Date.now();
+  
+  if (!tracker || now >= tracker.resetTime) {
+    limits.set(apiName, {
+      count: 1,
+      resetTime: now + 60000, // Reset after 1 minute
+    });
+  } else {
+    tracker.count++;
+  }
+  
+  saveRateLimitData(limits);
+}
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -49,59 +176,6 @@ const rateLimitTracker = new Map<string, { count: number; resetTime: number }>()
 
 function normalizeQuery(query: string): string {
   return query.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-function getCachedResults(query: string): GeocodingResult[] | null {
-  const normalizedQuery = normalizeQuery(query);
-  const cached = searchCache.get(normalizedQuery);
-  
-  if (cached && Date.now() - cached.timestamp < CONFIG.CACHE_DURATION) {
-    console.log(`✨ Using cached results for: "${query}"`);
-    return cached.data;
-  }
-  
-  return null;
-}
-
-function setCachedResults(query: string, results: GeocodingResult[]): void {
-  const normalizedQuery = normalizeQuery(query);
-  searchCache.set(normalizedQuery, {
-    data: results,
-    timestamp: Date.now(),
-  });
-  
-  // Clean old cache entries (keep only last 100)
-  if (searchCache.size > 100) {
-    const firstKey = searchCache.keys().next().value;
-    searchCache.delete(firstKey);
-  }
-}
-
-function isRateLimited(apiName: string): boolean {
-  const tracker = rateLimitTracker.get(apiName);
-  if (!tracker) return false;
-  
-  if (Date.now() < tracker.resetTime) {
-    return tracker.count >= 5; // Max 5 requests per minute per API
-  }
-  
-  // Reset counter
-  rateLimitTracker.delete(apiName);
-  return false;
-}
-
-function incrementRateLimit(apiName: string): void {
-  const tracker = rateLimitTracker.get(apiName);
-  const now = Date.now();
-  
-  if (!tracker || now >= tracker.resetTime) {
-    rateLimitTracker.set(apiName, {
-      count: 1,
-      resetTime: now + 60000, // Reset after 1 minute
-    });
-  } else {
-    tracker.count++;
-  }
 }
 
 async function fetchWithTimeout(
@@ -145,6 +219,35 @@ async function fetchWithTimeout(
 }
 
 // ============================================================================
+// INDIA FILTERING UTILITIES
+// ============================================================================
+
+function isIndianLocation(country: string): boolean {
+  const indiaNames = ['india', 'bharat', 'bharata', 'भारत', 'in'];
+  return indiaNames.includes(country.toLowerCase().trim());
+}
+
+function filterIndianResults(results: GeocodingResult[]): GeocodingResult[] {
+  return results.filter(location => {
+    // If country is explicitly India, keep it
+    if (isIndianLocation(location.country)) {
+      return true;
+    }
+    
+    // If coordinates are within India's approximate bounds, keep it
+    const lat = location.lat;
+    const lng = location.lng;
+    
+    // India's approximate bounds: 6°N to 35°N, 68°E to 97°E
+    if (lat >= 6 && lat <= 35 && lng >= 68 && lng <= 97) {
+      return true;
+    }
+    
+    return false;
+  });
+}
+
+// ============================================================================
 // REVERSE GEOCODING (Coordinates to City)
 // ============================================================================
 
@@ -152,7 +255,6 @@ export async function reverseGeocodeToCity(latitude: number, longitude: number):
   try {
     console.log(`🔄 Reverse geocoding: ${latitude}, ${longitude}`);
     
-    // Try multiple services with better error handling
     const services = [
       {
         name: 'Nominatim',
@@ -192,7 +294,6 @@ export async function reverseGeocodeToCity(latitude: number, longitude: number):
       },
     ];
 
-    // Try services sequentially
     for (const service of services) {
       try {
         console.log(`  🔄 Trying ${service.name}...`);
@@ -228,11 +329,18 @@ export async function geocodeCityToCoords(cityName: string): Promise<{ lat: numb
     const data = await res.json();
     
     if (data.results && data.results.length > 0) {
-      const result = data.results[0];
-      return {
-        lat: result.latitude,
-        lng: result.longitude,
-      };
+      // Filter for India only
+      const indiaResults = data.results.filter((r: any) => 
+        isIndianLocation(r.countryName || '')
+      );
+      
+      if (indiaResults.length > 0) {
+        const result = indiaResults[0];
+        return {
+          lat: result.latitude,
+          lng: result.longitude,
+        };
+      }
     }
     
     return null;
@@ -243,7 +351,7 @@ export async function geocodeCityToCoords(cityName: string): Promise<{ lat: numb
 }
 
 // ============================================================================
-// INDIVIDUAL API IMPLEMENTATIONS
+// INDIVIDUAL API IMPLEMENTATIONS (WITH INDIA FILTERS)
 // ============================================================================
 
 export async function geocodeWithPhoton(query: string): Promise<GeocodingResult[]> {
@@ -254,7 +362,8 @@ export async function geocodeWithPhoton(query: string): Promise<GeocodingResult[
   
   try {
     incrementRateLimit('Photon');
-    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10`;
+    // Add location bias towards India
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10&lat=${CONFIG.INDIA_CENTER_LAT}&lon=${CONFIG.INDIA_CENTER_LNG}&location_bias_scale=0.8`;
     const res = await fetchWithTimeout(url);
     
     if (!res.ok) return [];
@@ -263,7 +372,7 @@ export async function geocodeWithPhoton(query: string): Promise<GeocodingResult[
     
     if (!data.features || data.features.length === 0) return [];
     
-    return data.features.map((feature: any) => {
+    const results = data.features.map((feature: any) => {
       const props = feature.properties || {};
       const coords = feature.geometry?.coordinates || [];
       
@@ -285,6 +394,9 @@ export async function geocodeWithPhoton(query: string): Promise<GeocodingResult[
       };
     }).filter((location: any) => location.lat && location.lng);
     
+    // Filter for India only
+    return filterIndianResults(results);
+    
   } catch (error) {
     console.error('Photon API error:', error);
     return [];
@@ -299,10 +411,10 @@ export async function geocodeWithNominatim(query: string): Promise<{ lat: number
   
   try {
     incrementRateLimit('Nominatim');
-    // Add delay to respect Nominatim's 1 request per second rule
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&addressdetails=1`;
+    // Add countrycodes parameter for India
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&addressdetails=1&countrycodes=in`;
     const res = await fetchWithTimeout(url, {
       headers: { 'User-Agent': CONFIG.USER_AGENT },
     });
@@ -335,10 +447,10 @@ async function geocodeWithNominatimMultiple(query: string): Promise<GeocodingRes
   
   try {
     incrementRateLimit('Nominatim');
-    // Add delay to respect Nominatim's 1 request per second rule
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1`;
+    // Add countrycodes parameter for India
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1&countrycodes=in`;
     const res = await fetchWithTimeout(url, {
       headers: { 'User-Agent': CONFIG.USER_AGENT },
     });
@@ -349,7 +461,7 @@ async function geocodeWithNominatimMultiple(query: string): Promise<GeocodingRes
     
     if (!data || data.length === 0) return [];
     
-    return data.map((result: any) => {
+    const results = data.map((result: any) => {
       const address = result.address || {};
       const city = address.city || address.town || address.village || address.hamlet || '';
       const state = address.state || address.county || '';
@@ -365,6 +477,9 @@ async function geocodeWithNominatimMultiple(query: string): Promise<GeocodingRes
         lng: parseFloat(result.lon),
       };
     }).filter((location: any) => location.lat && location.lng);
+    
+    // Additional filter just to be safe
+    return filterIndianResults(results);
     
   } catch (error) {
     console.error('Nominatim multiple API error:', error);
@@ -385,7 +500,8 @@ export async function geocodeWithLocationIQ(query: string): Promise<GeocodingRes
   
   try {
     incrementRateLimit('LocationIQ');
-    const url = `https://us1.locationiq.com/v1/search?key=${API_KEYS.LOCATIONIQ}&q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1&normalizecity=1`;
+    // ✅ FIXED: Added countrycodes=in to filter for India only
+    const url = `https://us1.locationiq.com/v1/search?key=${API_KEYS.LOCATIONIQ}&q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1&normalizecity=1&countrycodes=in`;
     const res = await fetchWithTimeout(url);
     
     if (!res.ok) {
@@ -401,7 +517,7 @@ export async function geocodeWithLocationIQ(query: string): Promise<GeocodingRes
     
     if (!data || !Array.isArray(data) || data.length === 0) return [];
     
-    return data.map((result: any) => {
+    const results = data.map((result: any) => {
       const address = result.address || {};
       const city = address.city || address.town || address.village || address.hamlet || '';
       const state = address.state || address.county || '';
@@ -417,6 +533,8 @@ export async function geocodeWithLocationIQ(query: string): Promise<GeocodingRes
         lng: parseFloat(result.lon),
       };
     }).filter((location: any) => location.lat && location.lng);
+    
+    return filterIndianResults(results);
     
   } catch (error) {
     console.error('LocationIQ API error:', error);
@@ -437,6 +555,7 @@ export async function geocodeWithMapbox(query: string): Promise<GeocodingResult[
   
   try {
     incrementRateLimit('Mapbox');
+    // Already has country=IN filter - good!
     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${API_KEYS.MAPBOX}&limit=10&country=IN`;
     const res = await fetchWithTimeout(url);
     
@@ -484,6 +603,7 @@ export async function geocodeWithOpenCage(query: string): Promise<GeocodingResul
   
   try {
     incrementRateLimit('OpenCage');
+    // Already has countrycode=in - good!
     const url = `https://api.opencagedata.com/geocode/v1/json?key=${API_KEYS.OPENCAGE}&q=${encodeURIComponent(query)}&limit=10&no_annotations=1&countrycode=in`;
     const res = await fetchWithTimeout(url);
     
@@ -536,6 +656,7 @@ export async function geocodeWithMapMyIndia(query: string): Promise<GeocodingRes
   
   try {
     incrementRateLimit('MapMyIndia');
+    // Already India-specific - good!
     const url = `https://atlas.mapmyindia.com/api/places/search/json?query=${encodeURIComponent(query)}&region=ind&tokenizeAddress=true&pod=SLC,LC,CITY,VLG,SDIST,DIST,STATE`;
     const res = await fetchWithTimeout(url, {
       headers: {
@@ -589,7 +710,7 @@ async function geocodeWithBigDataCloud(query: string): Promise<GeocodingResult[]
     
     if (!data.results || data.results.length === 0) return [];
     
-    return data.results.map((result: any) => {
+    const results = data.results.map((result: any) => {
       const city = result.city || result.locality || result.principalSubdivision || '';
       const state = result.principalSubdivision || '';
       const country = result.countryName || 'India';
@@ -605,6 +726,9 @@ async function geocodeWithBigDataCloud(query: string): Promise<GeocodingResult[]
       };
     }).filter((location: any) => location.lat && location.lng);
     
+    // Filter for India only
+    return filterIndianResults(results);
+    
   } catch (error) {
     console.error('BigDataCloud API error:', error);
     return [];
@@ -612,7 +736,7 @@ async function geocodeWithBigDataCloud(query: string): Promise<GeocodingResult[]
 }
 
 // ============================================================================
-// ENHANCED SEARCH WITH SMART SEQUENCING
+// ENHANCED SEARCH WITH SMART SEQUENCING & INDIA FILTERING
 // ============================================================================
 
 export async function searchLocationsEnhanced(query: string): Promise<GeocodingResult[]> {
@@ -630,7 +754,7 @@ export async function searchLocationsEnhanced(query: string): Promise<GeocodingR
     return cachedResults;
   }
 
-  console.log(`🔍 Starting enhanced location search for: "${trimmedQuery}"`);
+  console.log(`🔍 Starting enhanced location search for: "${trimmedQuery}" (India only)`);
 
   // Try APIs in priority order (one at a time to avoid rate limits)
   const apiOrder = [

@@ -19,7 +19,7 @@ const playfair = Playfair_Display({
 })
 
 export const metadata: Metadata = {
-  title: "Koffista - Sip on a Feeling",
+  title: "Kafumi - The Essence of Every Cafe",
   description: "Discover cafés that match your mood, vibe, budget, and preferences",
   generator: "v0.app",
 }

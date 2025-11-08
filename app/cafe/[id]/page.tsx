@@ -8,7 +8,7 @@ import { Navigation } from "@/components/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { cafes } from "@/lib/cafe-data"
+import { getCafeById } from "@/lib/cafe-data-service"
 import type { Cafe } from "@/lib/types"
 import {
   Star,
@@ -23,6 +23,8 @@ import {
   Search,
   ArrowLeft,
   ExternalLink,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { VegMark, NonVegMark, EggMark } from "@/components/icons"
 import { formatKm } from "@/lib/geocoding"
@@ -38,21 +40,35 @@ export default function CafeDetailPage() {
   const [location, setLocation] = useState("Bangalore")
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [distanceLabel, setDistanceLabel] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [imageErrors, setImageErrors] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    const savedLocation = localStorage.getItem("userLocation")
-    if (savedLocation) setLocation(savedLocation)
+    const loadCafe = async () => {
+      try {
+        setLoading(true)
+        const savedLocation = localStorage.getItem("userLocation")
+        if (savedLocation) setLocation(savedLocation)
 
-    const foundCafe = cafes.find((c) => c.id === cafeId)
-    if (foundCafe) {
-      setCafe(foundCafe)
+        const foundCafe = await getCafeById(cafeId)
+        if (foundCafe) {
+          setCafe(foundCafe)
+          setImageErrors(new Set()) // Reset image errors for new cafe
 
-      const savedFavorites = localStorage.getItem("favorites")
-      if (savedFavorites) {
-        const favorites = JSON.parse(savedFavorites)
-        setIsFavorite(favorites.includes(foundCafe.id))
+          const savedFavorites = localStorage.getItem("favorites")
+          if (savedFavorites) {
+            const favorites = JSON.parse(savedFavorites)
+            setIsFavorite(favorites.includes(foundCafe.id))
+          }
+        }
+      } catch (error) {
+        console.error('Error loading cafe:', error)
+      } finally {
+        setLoading(false)
       }
     }
+
+    loadCafe()
   }, [cafeId])
 
   useEffect(() => {
@@ -68,6 +84,19 @@ export default function CafeDetailPage() {
     })()
   }, [cafe])
 
+  // Auto-scroll images every 4 seconds
+  useEffect(() => {
+    if (!cafe || cafe.images.length <= 1) return
+
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => 
+        prevIndex === cafe.images.length - 1 ? 0 : prevIndex + 1
+      )
+    }, 4000)
+
+    return () => clearInterval(interval)
+  }, [cafe])
+
   const toggleFavorite = () => {
     if (!cafe) return
 
@@ -78,6 +107,30 @@ export default function CafeDetailPage() {
 
     localStorage.setItem("favorites", JSON.stringify(newFavorites))
     setIsFavorite(!isFavorite)
+  }
+
+  const nextImage = () => {
+    if (!cafe) return
+    setCurrentImageIndex((prevIndex) => 
+      prevIndex === cafe.images.length - 1 ? 0 : prevIndex + 1
+    )
+  }
+
+  const previousImage = () => {
+    if (!cafe) return
+    setCurrentImageIndex((prevIndex) => 
+      prevIndex === 0 ? cafe.images.length - 1 : prevIndex - 1
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-muted-foreground">Loading café details...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!cafe) {
@@ -104,9 +157,36 @@ export default function CafeDetailPage() {
             Back
           </Button>
 
-          {/* Image Gallery */}
-          <div className="relative h-64 md:h-96 lg:h-[500px] rounded-xl md:rounded-2xl overflow-hidden">
-            <Image src={cafe.images[currentImageIndex] || cafe.image} alt={cafe.name} fill className="object-cover" />
+          {/* Image Gallery with Navigation Arrows */}
+          <div className="relative h-64 md:h-96 lg:h-[500px] rounded-xl md:rounded-2xl overflow-hidden bg-muted group">
+            {(() => {
+              let currentImage = cafe.images[currentImageIndex] || cafe.image || '/placeholder.jpg';
+              const hasError = imageErrors.has(currentImageIndex);
+              let imageSrc = (hasError || !currentImage || currentImage.trim() === '' || currentImage.includes('placeholder')) 
+                ? '/placeholder.jpg' 
+                : currentImage;
+              
+              // Use proxy for Google Drive URLs
+              if (imageSrc.includes('drive.google.com') && imageSrc !== '/placeholder.jpg') {
+                imageSrc = `/api/proxy-image?url=${encodeURIComponent(imageSrc)}`;
+              }
+              
+              return (
+                <img
+                  src={imageSrc}
+                  alt={cafe.name}
+                  className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => {
+                    if (e.currentTarget.src !== window.location.origin + '/placeholder.jpg') {
+                      e.currentTarget.src = '/placeholder.jpg';
+                      setImageErrors(prev => new Set(prev).add(currentImageIndex));
+                    }
+                  }}
+                />
+              );
+            })()}
+            
             {cafe.type === 'Veg' && (
               <div className="absolute top-3 md:top-4 right-3 md:right-4 px-3 py-1.5 rounded-full text-xs md:text-sm font-semibold flex items-center gap-2 bg-white text-emerald-700 border border-emerald-300 shadow-sm">
                 <VegMark className="h-4 w-4" />
@@ -114,7 +194,27 @@ export default function CafeDetailPage() {
               </div>
             )}
 
-            {/* Image Navigation */}
+            {/* Navigation Arrows - visible on hover */}
+            {cafe.images.length > 1 && (
+              <>
+                <button
+                  onClick={previousImage}
+                  className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 md:p-3 rounded-full transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-5 w-5 md:h-6 md:w-6" />
+                </button>
+                <button
+                  onClick={nextImage}
+                  className="absolute right-3 md:right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 md:p-3 rounded-full transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-5 w-5 md:h-6 md:w-6" />
+                </button>
+              </>
+            )}
+
+            {/* Image Navigation Dots */}
             {cafe.images.length > 1 && (
               <div className="absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 md:gap-2">
                 {cafe.images.map((_, index) => (
@@ -122,8 +222,9 @@ export default function CafeDetailPage() {
                     key={index}
                     onClick={() => setCurrentImageIndex(index)}
                     className={`w-2 h-2 rounded-full transition-all ${
-                      index === currentImageIndex ? "bg-primary w-6 md:w-8" : "bg-background/60"
+                      index === currentImageIndex ? "bg-white w-6 md:w-8" : "bg-white/60 hover:bg-white/80"
                     }`}
+                    aria-label={`Go to image ${index + 1}`}
                   />
                 ))}
               </div>
@@ -197,8 +298,8 @@ export default function CafeDetailPage() {
               <TabsTrigger value="vibe" className="text-xs md:text-sm py-2.5">
                 Vibe
               </TabsTrigger>
-              <TabsTrigger value="reviews" className="text-xs md:text-sm py-2.5">
-                Reviews
+              <TabsTrigger value="photos" className="text-xs md:text-sm py-2.5">
+                Photos
               </TabsTrigger>
               <TabsTrigger value="contact" className="text-xs md:text-sm py-2.5">
                 Contact
@@ -310,25 +411,50 @@ export default function CafeDetailPage() {
               </Card>
             </TabsContent>
 
-            {/* Reviews Tab */}
-            <TabsContent value="reviews" className="space-y-4 mt-6">
-              {cafe.reviews.map((review, index) => (
-                <Card key={index}>
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="font-semibold text-foreground">{review.userName}</p>
-                        <p className="text-sm text-muted-foreground">{review.date}</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                        <span className="font-semibold">{review.rating}</span>
-                      </div>
+            {/* Photos Tab (replacing Reviews) */}
+            <TabsContent value="photos" className="space-y-4 mt-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                {cafe.images.length > 0 ? cafe.images.map((image, index) => {
+                  const hasError = imageErrors.has(index);
+                  let imageSrc = (hasError || !image || image.trim() === '' || image.includes('placeholder')) 
+                    ? '/placeholder.jpg' 
+                    : image;
+                  
+                  // Use proxy for Google Drive URLs
+                  if (imageSrc.includes('drive.google.com') && imageSrc !== '/placeholder.jpg') {
+                    imageSrc = `/api/proxy-image?url=${encodeURIComponent(imageSrc)}`;
+                  }
+                  
+                  return (
+                    <div
+                      key={index}
+                      className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity bg-muted"
+                      onClick={() => setCurrentImageIndex(index)}
+                    >
+                      <img
+                        src={imageSrc}
+                        alt={`${cafe.name} photo ${index + 1}`}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          if (e.currentTarget.src !== window.location.origin + '/placeholder.jpg') {
+                            e.currentTarget.src = '/placeholder.jpg';
+                            setImageErrors(prev => new Set(prev).add(index));
+                          }
+                        }}
+                      />
                     </div>
-                    <p className="text-foreground leading-relaxed">{review.text}</p>
-                  </CardContent>
-                </Card>
-              ))}
+                  );
+                }) : (
+                  <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
+                    <img
+                      src="/placeholder.jpg"
+                      alt={`${cafe.name} placeholder`}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+              </div>
             </TabsContent>
 
             {/* Contact Tab */}
@@ -344,7 +470,7 @@ export default function CafeDetailPage() {
                         <p className="text-foreground">{cafe.location.address}</p>
                         <Button variant="link" className="h-auto p-0 text-primary" asChild>
                           <a
-                            href={`https://www.google.com/maps/search/?api=1&query=${cafe.location.coordinates.lat},${cafe.location.coordinates.lng}`}
+                            href={cafe.contact.googleMapsLink || `https://www.google.com/maps/search/?api=1&query=${cafe.location.coordinates.lat},${cafe.location.coordinates.lng}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1"

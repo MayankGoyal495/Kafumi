@@ -7,7 +7,7 @@ import { Header } from "@/components/header"
 import { Navigation } from "@/components/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { getRandomCafe } from "@/lib/cafe-data"
+import { getCafes } from "@/lib/cafe-data-service"
 import type { Cafe } from "@/lib/types"
 import { Sparkles, MapPin, Star, Heart, RotateCcw, ArrowRight } from "lucide-react"
 import { formatKm } from "@/lib/geocoding"
@@ -16,16 +16,25 @@ import { getDistanceKm } from "@/lib/distance"
 export default function RandomCafePage() {
   const router = useRouter()
   const [cafe, setCafe] = useState<Cafe | null>(null)
+  const [cafes, setCafes] = useState<Cafe[]>([])
   const [isFavorite, setIsFavorite] = useState(false)
   const [location, setLocation] = useState("Bangalore")
   const [isAnimating, setIsAnimating] = useState(false)
   const [distanceLabel, setDistanceLabel] = useState<string | null>(null)
+  const [imageError, setImageError] = useState(false)
 
   useEffect(() => {
-    const savedLocation = localStorage.getItem("userLocation")
-    if (savedLocation) setLocation(savedLocation)
+    const initData = async () => {
+      const savedLocation = localStorage.getItem("userLocation")
+      if (savedLocation) setLocation(savedLocation)
 
-    loadRandomCafe()
+      const fetchedCafes = await getCafes()
+      setCafes(fetchedCafes)
+      if (fetchedCafes.length > 0) {
+        loadRandomCafe(fetchedCafes)
+      }
+    }
+    initData()
   }, [])
 
   useEffect(() => {
@@ -44,10 +53,14 @@ export default function RandomCafePage() {
     }
   }, [cafe])
 
-  const loadRandomCafe = () => {
+  const loadRandomCafe = (cafeList?: Cafe[]) => {
+    const list = cafeList || cafes
+    if (list.length === 0) return
+    
     setIsAnimating(true)
+    setImageError(false) // Reset image error for new cafe
     setTimeout(() => {
-      const randomCafe = getRandomCafe()
+      const randomCafe = list[Math.floor(Math.random() * list.length)]
       setCafe(randomCafe)
 
       const savedFavorites = localStorage.getItem("favorites")
@@ -106,8 +119,32 @@ export default function RandomCafePage() {
           <Card
             className={`overflow-hidden transition-opacity duration-500 ${isAnimating ? "opacity-0" : "opacity-100"}`}
           >
-            <div className="relative h-64 sm:h-80 w-full">
-              <Image src={cafe.image || "/placeholder.svg"} alt={cafe.name} fill className="object-cover" />
+            <div className="relative h-64 sm:h-80 w-full bg-muted">
+              {(() => {
+                let imageSrc = imageError || !cafe.image || cafe.image.trim() === '' || cafe.image.includes('placeholder')
+                  ? '/placeholder.jpg'
+                  : cafe.image;
+                
+                // Use proxy for Google Drive URLs
+                if (imageSrc.includes('drive.google.com') && imageSrc !== '/placeholder.jpg') {
+                  imageSrc = `/api/proxy-image?url=${encodeURIComponent(imageSrc)}`;
+                }
+                
+                return (
+                  <img
+                    src={imageSrc}
+                    alt={cafe.name}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      if (e.currentTarget.src !== window.location.origin + '/placeholder.jpg') {
+                        e.currentTarget.src = '/placeholder.jpg';
+                        setImageError(true);
+                      }
+                    }}
+                  />
+                );
+              })()}
               <div className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-sm font-medium">
                 {cafe.type}
               </div>

@@ -39,7 +39,7 @@ export default function LandingPage() {
             isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
           }`}
         >
-          <Logo className="justify-center mb-6 scale-125" />
+          <Logo className="justify-center mb-6 scale-[1.4] sm:scale-[1.5] md:scale-[1.6]" clickable={false} />
         </div>
 
         {/* Slogan with Animation */}
@@ -78,7 +78,7 @@ export default function LandingPage() {
           }`}
         >
           <p className="text-sm text-muted-foreground">
-            Sip on a feeling • Experience • Explore
+            The Essence of Every Cafe • Experience • Explore
           </p>
         </div>
       </div>

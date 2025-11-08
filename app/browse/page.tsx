@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent } from "@/components/ui/card"
-import { cafes } from "@/lib/cafe-data"
+import { getCafes } from "@/lib/cafe-data-service"
+import type { Cafe } from "@/lib/types"
 import { formatKm } from "@/lib/geocoding"
 import { getDistanceKm } from "@/lib/distance"
 import { Search, SlidersHorizontal, X, ArrowUpDown, Star, MapPin, DollarSign } from 'lucide-react'
@@ -37,7 +38,8 @@ function BrowseContent() {
   const initialQuery = searchParams.get("q") || ""
 
   const [searchQuery, setSearchQuery] = useState(initialQuery)
-  const [filteredCafes, setFilteredCafes] = useState(cafes)
+  const [cafes, setCafes] = useState<Cafe[]>([])
+  const [filteredCafes, setFilteredCafes] = useState<Cafe[]>([])
   const [favorites, setFavorites] = useState<string[]>([])
   const [location, setLocation] = useState("Bangalore")
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null)
@@ -126,6 +128,11 @@ function BrowseContent() {
 
         const savedFavorites = localStorage.getItem("favorites")
         if (savedFavorites) setFavorites(JSON.parse(savedFavorites))
+
+        // Fetch cafes from Google Sheets
+        const fetchedCafes = await getCafes()
+        setCafes(fetchedCafes)
+        setFilteredCafes(fetchedCafes)
       } catch (error) {
         console.error('Error loading data:', error)
       } finally {
@@ -254,223 +261,195 @@ function BrowseContent() {
     selectedVibes.length + selectedAmenities.length + selectedPriceRanges.length + selectedTypes.length + selectedPurposes.length + selectedFoodDrinkTypes.length + (maxDistance ? 1 : 0)
 
   const FilterContent = () => (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Purpose Filter */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="space-y-3">
-            <Label className="text-base font-semibold text-foreground">Purpose</Label>
-            <div className="grid grid-cols-1 gap-2">
-              {purposeOptions.map((purpose) => (
-                <div key={purpose} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`purpose-${purpose}`}
-                    checked={selectedPurposes.includes(purpose)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedPurposes([...selectedPurposes, purpose])
-                      } else {
-                        setSelectedPurposes(selectedPurposes.filter((p) => p !== purpose))
-                      }
-                    }}
-                  />
-                  <label htmlFor={`purpose-${purpose}`} className="text-sm cursor-pointer text-foreground">
-                    {purpose}
-                  </label>
-                </div>
-              ))}
+      <div className="bg-card border rounded-lg p-4">
+        <Label className="text-base font-semibold text-foreground mb-3 block">Purpose</Label>
+        <div className="space-y-2.5">
+          {purposeOptions.map((purpose) => (
+            <div key={purpose} className="flex items-center space-x-3">
+              <Checkbox
+                id={`purpose-${purpose}`}
+                checked={selectedPurposes.includes(purpose)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSelectedPurposes([...selectedPurposes, purpose])
+                  } else {
+                    setSelectedPurposes(selectedPurposes.filter((p) => p !== purpose))
+                  }
+                }}
+              />
+              <label htmlFor={`purpose-${purpose}`} className="text-sm cursor-pointer text-foreground leading-none">
+                {purpose}
+              </label>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          ))}
+        </div>
+      </div>
 
       {/* Type Filter */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="space-y-3">
-            <Label className="text-base font-semibold text-foreground">Café Type</Label>
-            <div className="space-y-2">
-              {typeOptions.map((type) => (
-                <div key={type} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`type-${type}`}
-                    checked={selectedTypes.includes(type)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedTypes([...selectedTypes, type])
-                      } else {
-                        setSelectedTypes(selectedTypes.filter((t) => t !== type))
-                      }
-                    }}
-                  />
-                  <label htmlFor={`type-${type}`} className="text-sm cursor-pointer text-foreground">
-                    {type}
-                  </label>
-                </div>
-              ))}
+      <div className="bg-card border rounded-lg p-4">
+        <Label className="text-base font-semibold text-foreground mb-3 block">Café Type</Label>
+        <div className="space-y-2.5">
+          {typeOptions.map((type) => (
+            <div key={type} className="flex items-center space-x-3">
+              <Checkbox
+                id={`type-${type}`}
+                checked={selectedTypes.includes(type)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSelectedTypes([...selectedTypes, type])
+                  } else {
+                    setSelectedTypes(selectedTypes.filter((t) => t !== type))
+                  }
+                }}
+              />
+              <label htmlFor={`type-${type}`} className="text-sm cursor-pointer text-foreground leading-none">
+                {type}
+              </label>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          ))}
+        </div>
+      </div>
 
       {/* Vibe Filter */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="space-y-3">
-            <Label className="text-base font-semibold text-foreground">Vibe & Ambience</Label>
-            <div className="grid grid-cols-1 gap-2">
-              {vibeOptions.map((vibe) => (
-                <div key={vibe} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`vibe-${vibe}`}
-                    checked={selectedVibes.includes(vibe)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedVibes([...selectedVibes, vibe])
-                      } else {
-                        setSelectedVibes(selectedVibes.filter((v) => v !== vibe))
-                      }
-                    }}
-                  />
-                  <label htmlFor={`vibe-${vibe}`} className="text-sm cursor-pointer text-foreground">
-                    {vibe}
-                  </label>
-                </div>
-              ))}
+      <div className="bg-card border rounded-lg p-4">
+        <Label className="text-base font-semibold text-foreground mb-3 block">Vibe & Ambience</Label>
+        <div className="space-y-2.5">
+          {vibeOptions.map((vibe) => (
+            <div key={vibe} className="flex items-center space-x-3">
+              <Checkbox
+                id={`vibe-${vibe}`}
+                checked={selectedVibes.includes(vibe)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSelectedVibes([...selectedVibes, vibe])
+                  } else {
+                    setSelectedVibes(selectedVibes.filter((v) => v !== vibe))
+                  }
+                }}
+              />
+              <label htmlFor={`vibe-${vibe}`} className="text-sm cursor-pointer text-foreground leading-none">
+                {vibe}
+              </label>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          ))}
+        </div>
+      </div>
 
       {/* Amenities Filter */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="space-y-3">
-            <Label className="text-base font-semibold text-foreground">Amenities</Label>
-            <div className="grid grid-cols-1 gap-2">
-              {amenityOptions.map((amenity) => (
-                <div key={amenity} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`amenity-${amenity}`}
-                    checked={selectedAmenities.includes(amenity)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedAmenities([...selectedAmenities, amenity])
-                      } else {
-                        setSelectedAmenities(selectedAmenities.filter((a) => a !== amenity))
-                      }
-                    }}
-                  />
-                  <label htmlFor={`amenity-${amenity}`} className="text-sm cursor-pointer text-foreground">
-                    {amenity}
-                  </label>
-                </div>
-              ))}
+      <div className="bg-card border rounded-lg p-4">
+        <Label className="text-base font-semibold text-foreground mb-3 block">Amenities</Label>
+        <div className="space-y-2.5">
+          {amenityOptions.map((amenity) => (
+            <div key={amenity} className="flex items-center space-x-3">
+              <Checkbox
+                id={`amenity-${amenity}`}
+                checked={selectedAmenities.includes(amenity)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSelectedAmenities([...selectedAmenities, amenity])
+                  } else {
+                    setSelectedAmenities(selectedAmenities.filter((a) => a !== amenity))
+                  }
+                }}
+              />
+              <label htmlFor={`amenity-${amenity}`} className="text-sm cursor-pointer text-foreground leading-none">
+                {amenity}
+              </label>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          ))}
+        </div>
+      </div>
 
       {/* Food & Drink Types Filter */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="space-y-3">
-            <Label className="text-base font-semibold text-foreground">Food & Drinks</Label>
-            <div className="grid grid-cols-1 gap-2">
-              {foodDrinkTypeOptions.map((type) => (
-                <div key={type} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`food-${type}`}
-                    checked={selectedFoodDrinkTypes.includes(type)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedFoodDrinkTypes([...selectedFoodDrinkTypes, type])
-                      } else {
-                        setSelectedFoodDrinkTypes(selectedFoodDrinkTypes.filter((t) => t !== type))
-                      }
-                    }}
-                  />
-                  <label htmlFor={`food-${type}`} className="text-sm cursor-pointer text-foreground">
-                    {type}
-                  </label>
-                </div>
-              ))}
+      <div className="bg-card border rounded-lg p-4">
+        <Label className="text-base font-semibold text-foreground mb-3 block">Food & Drinks</Label>
+        <div className="space-y-2.5">
+          {foodDrinkTypeOptions.map((type) => (
+            <div key={type} className="flex items-center space-x-3">
+              <Checkbox
+                id={`food-${type}`}
+                checked={selectedFoodDrinkTypes.includes(type)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSelectedFoodDrinkTypes([...selectedFoodDrinkTypes, type])
+                  } else {
+                    setSelectedFoodDrinkTypes(selectedFoodDrinkTypes.filter((t) => t !== type))
+                  }
+                }}
+              />
+              <label htmlFor={`food-${type}`} className="text-sm cursor-pointer text-foreground leading-none">
+                {type}
+              </label>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          ))}
+        </div>
+      </div>
 
       {/* Price Range Filter */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="space-y-3">
-            <Label className="text-base font-semibold text-foreground">Price Range</Label>
-            <div className="space-y-2">
-              {priceRangeOptions.map((range) => (
-                <div key={range} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`price-${range}`}
-                    checked={selectedPriceRanges.includes(range)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedPriceRanges([...selectedPriceRanges, range])
-                      } else {
-                        setSelectedPriceRanges(selectedPriceRanges.filter((p) => p !== range))
-                      }
-                    }}
-                  />
-                  <label htmlFor={`price-${range}`} className="text-sm cursor-pointer text-foreground">
-                    {range}
-                  </label>
-                </div>
-              ))}
+      <div className="bg-card border rounded-lg p-4">
+        <Label className="text-base font-semibold text-foreground mb-3 block">Price Range</Label>
+        <div className="space-y-2.5">
+          {priceRangeOptions.map((range) => (
+            <div key={range} className="flex items-center space-x-3">
+              <Checkbox
+                id={`price-${range}`}
+                checked={selectedPriceRanges.includes(range)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSelectedPriceRanges([...selectedPriceRanges, range])
+                  } else {
+                    setSelectedPriceRanges(selectedPriceRanges.filter((p) => p !== range))
+                  }
+                }}
+              />
+              <label htmlFor={`price-${range}`} className="text-sm cursor-pointer text-foreground leading-none">
+                {range}
+              </label>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          ))}
+        </div>
+      </div>
 
       {/* Distance Filter */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="space-y-3">
-            <Label className="text-base font-semibold text-foreground">Maximum Distance</Label>
-            <div className="space-y-2">
-              {distanceOptions.map((option) => (
-                <div key={option.value} className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    id={`distance-${option.value}`}
-                    name="distance"
-                    value={option.value}
-                    checked={maxDistance === option.value}
-                    onChange={(e) => setMaxDistance(e.target.value)}
-                    className="w-4 h-4 text-primary"
-                  />
-                  <label htmlFor={`distance-${option.value}`} className="text-sm cursor-pointer text-foreground">
-                    {option.label}
-                  </label>
-                </div>
-              ))}
-              {maxDistance && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setMaxDistance("")}
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Clear distance filter
-                </Button>
-              )}
+      <div className="bg-card border rounded-lg p-4">
+        <Label className="text-base font-semibold text-foreground mb-3 block">Maximum Distance</Label>
+        <div className="space-y-2.5">
+          {distanceOptions.map((option) => (
+            <div key={option.value} className="flex items-center space-x-3">
+              <input
+                type="radio"
+                id={`distance-${option.value}`}
+                name="distance"
+                value={option.value}
+                checked={maxDistance === option.value}
+                onChange={(e) => setMaxDistance(e.target.value)}
+                className="w-4 h-4 text-primary cursor-pointer"
+              />
+              <label htmlFor={`distance-${option.value}`} className="text-sm cursor-pointer text-foreground leading-none">
+                {option.label}
+              </label>
             </div>
-            {!userCoords && (
-              <p className="text-xs text-muted-foreground">
-                Distance filtering requires location access. Please enable location in the location page.
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          ))}
+          {maxDistance && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setMaxDistance("")}
+              className="text-xs text-muted-foreground hover:text-foreground mt-2"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Clear distance filter
+            </Button>
+          )}
+        </div>
+        {!userCoords && (
+          <p className="text-xs text-muted-foreground mt-3 bg-amber-50 dark:bg-amber-950/20 p-2 rounded border border-amber-200 dark:border-amber-900">
+            Distance filtering requires location access. Please enable location in the location page.
+          </p>
+        )}
+      </div>
     </div>
   )
 
@@ -532,26 +511,24 @@ function BrowseContent() {
                     <SlidersHorizontal className="h-4 w-4" />
                     Filters
                     {activeFiltersCount > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold">
                         {activeFiltersCount}
                       </span>
                     )}
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-                  <SheetHeader>
-                    <SheetTitle>Filters</SheetTitle>
-                    <SheetDescription>Refine your café search</SheetDescription>
+                  <SheetHeader className="mb-6">
+                    <SheetTitle>Filter Cafés</SheetTitle>
+                    <SheetDescription>Narrow down your search with filters</SheetDescription>
                   </SheetHeader>
-                  <div className="mt-6">
-                    <FilterContent />
-                    {activeFiltersCount > 0 && (
-                      <Button variant="outline" onClick={clearFilters} className="w-full mt-6 gap-2">
-                        <X className="h-4 w-4" />
-                        Clear All Filters
-                      </Button>
-                    )}
-                  </div>
+                  <FilterContent />
+                  {activeFiltersCount > 0 && (
+                    <Button variant="outline" onClick={clearFilters} className="w-full mt-6 gap-2">
+                      <X className="h-4 w-4" />
+                      Clear All Filters ({activeFiltersCount})
+                    </Button>
+                  )}
                 </SheetContent>
               </Sheet>
             </div>
@@ -560,20 +537,22 @@ function BrowseContent() {
           {/* Active Filters Display */}
           {activeFiltersCount > 0 && (
             <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-foreground">Active filters:</span>
-                  {[...selectedPurposes, ...selectedTypes, ...selectedVibes, ...selectedAmenities, ...selectedFoodDrinkTypes, ...selectedPriceRanges].map((filter) => (
-                    <span key={filter} className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full font-medium">
-                      {filter}
-                    </span>
-                  ))}
-                  {maxDistance && (
-                    <span className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full font-medium">
-                      Max {distanceOptions.find(opt => opt.value === maxDistance)?.label}
-                    </span>
-                  )}
-                  <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-foreground">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-start gap-3 flex-wrap">
+                  <span className="text-sm font-semibold text-foreground mt-1">Active filters:</span>
+                  <div className="flex flex-wrap gap-2 flex-1">
+                    {[...selectedPurposes, ...selectedTypes, ...selectedVibes, ...selectedAmenities, ...selectedFoodDrinkTypes, ...selectedPriceRanges].map((filter) => (
+                      <span key={filter} className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full font-medium border border-primary/20">
+                        {filter}
+                      </span>
+                    ))}
+                    {maxDistance && (
+                      <span className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full font-medium border border-primary/20">
+                        {distanceOptions.find(opt => opt.value === maxDistance)?.label}
+                      </span>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-xs text-muted-foreground hover:text-foreground">
                     <X className="h-3 w-3 mr-1" />
                     Clear all
                   </Button>
@@ -585,16 +564,16 @@ function BrowseContent() {
           {/* Results Count */}
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              Showing {filteredCafes.length} {filteredCafes.length === 1 ? "café" : "cafés"}
+              Showing <span className="font-semibold text-foreground">{filteredCafes.length}</span> {filteredCafes.length === 1 ? "café" : "cafés"}
               {activeFiltersCount > 0 && (
-                <span className="ml-2 text-xs bg-muted px-2 py-1 rounded-full">
+                <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-1 rounded-full border border-primary/20 font-medium">
                   {activeFiltersCount} filter{activeFiltersCount > 1 ? "s" : ""} applied
                 </span>
               )}
             </div>
             {filteredCafes.length > 0 && (
               <div className="text-xs text-muted-foreground">
-                Sorted by {sortOptions.find(opt => opt.value === sortBy)?.label}
+                Sorted by: <span className="font-medium">{sortOptions.find(opt => opt.value === sortBy)?.label}</span>
               </div>
             )}
           </div>

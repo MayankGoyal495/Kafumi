@@ -13,8 +13,8 @@ export default function AboutPage() {
       <main className="container mx-auto px-4 py-12 space-y-16 max-w-4xl">
         {/* Hero */}
         <section className="text-center space-y-4">
-          <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground">About Koffista</h1>
-          <p className="text-xl text-primary font-medium">Sip on a feeling</p>
+          <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground">About Kafumi</h1>
+          <p className="text-xl text-primary font-medium">The Essence of Every Cafe</p>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto text-balance">
             Your personal café discovery companion, helping you find the perfect spot for every mood and moment.
           </p>
@@ -24,7 +24,7 @@ export default function AboutPage() {
         <section className="space-y-4">
           <h2 className="text-3xl font-serif font-bold text-foreground">Our Mission</h2>
           <p className="text-muted-foreground leading-relaxed">
-            At Koffista, we believe that finding the right café is about more than just coffee. It's about discovering
+            At Kafumi, we believe that finding the right café is about more than just coffee. It's about discovering
             spaces that match your mood, support your activities, and enhance your experiences. Whether you're looking
             for a quiet corner to work, a vibrant spot to meet friends, or a romantic setting for a date, we're here to
             help you find your perfect match.
@@ -174,7 +174,7 @@ export default function AboutPage() {
         <section className="bg-secondary/30 rounded-2xl p-8 text-center space-y-4">
           <h2 className="text-2xl font-serif font-bold text-foreground">Get in Touch</h2>
           <p className="text-muted-foreground">Have questions or suggestions? We'd love to hear from you.</p>
-          <p className="text-primary font-medium">hello@koffista.com</p>
+          <p className="text-primary font-medium">hello@Kafumi.com</p>
         </section>
       </main>
     </div>

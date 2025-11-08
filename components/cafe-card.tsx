@@ -1,6 +1,5 @@
 "use client"
 
-import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { Star, MapPin, Heart, VegMark } from "@/components/icons"
@@ -23,6 +22,7 @@ export function CafeCard({ cafe, onToggleFavorite, isFavorite = false }: CafeCar
   const [distanceLabel, setDistanceLabel] = useState<string | null>(null)
   const [localFavorites, setLocalFavorites] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [imageError, setImageError] = useState(false)
   
   // Load favorites from localStorage
   useEffect(() => {
@@ -74,17 +74,60 @@ export function CafeCard({ cafe, onToggleFavorite, isFavorite = false }: CafeCar
   return (
     <Card className="overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all active:scale-[0.98] group flex flex-col h-full">
       <Link href={`/cafe/${cafe.id}`}>
-        <div className="relative h-44 sm:h-48 md:h-52 w-full overflow-hidden -mb-2">
-          <Image 
-            src={cafe.image || "/placeholder.svg"} 
-            alt={cafe.name} 
-            fill 
-            className="object-cover group-hover:scale-105 transition-transform duration-300" 
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            priority={false}
-            placeholder="blur"
-            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
-          />
+        <div className="relative h-44 sm:h-48 md:h-52 w-full overflow-hidden -mb-2" style={{ backgroundColor: '#f3f4f6' }}>
+          {(() => {
+            let imageSrc = imageError || !cafe.image || cafe.image.trim() === '' || cafe.image.includes('placeholder')
+              ? '/placeholder.jpg'
+              : cafe.image;
+            
+            // If it's a Google Drive URL, use proxy endpoint for better reliability
+            if (imageSrc.includes('drive.google.com') && imageSrc !== '/placeholder.jpg') {
+              imageSrc = `/api/proxy-image?url=${encodeURIComponent(imageSrc)}`;
+            }
+            
+            // Debug: Log image URL for first cafe
+            if (cafe.id === 'cafe_1') {
+              console.log('Cafe Card Image Debug:', {
+                cafeName: cafe.name,
+                originalImage: cafe.image,
+                finalImageSrc: imageSrc,
+                hasError: imageError
+              });
+            }
+            
+            return (
+              <img
+                key={imageSrc}
+                src={imageSrc}
+                alt={cafe.name}
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                style={{ 
+                  display: 'block',
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }}
+                loading="lazy"
+                onLoad={() => {
+                  // Image loaded successfully
+                  if (cafe.id === 'cafe_1') {
+                    console.log('Image loaded successfully:', imageSrc);
+                  }
+                }}
+                onError={(e) => {
+                  console.error('Image failed to load:', imageSrc, 'for cafe:', cafe.name);
+                  const currentSrc = e.currentTarget.src;
+                  const placeholderUrl = window.location.origin + '/placeholder.jpg';
+                  
+                  // If it's not already the placeholder, try placeholder
+                  if (!currentSrc.includes('placeholder.jpg') && currentSrc !== placeholderUrl) {
+                    e.currentTarget.src = '/placeholder.jpg';
+                    setImageError(true);
+                  }
+                }}
+              />
+            );
+          })()}
           {cafe.type === 'Veg' && (
             <div className="absolute top-2 right-2 sm:top-3 sm:right-3 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 bg-white text-emerald-700 border border-emerald-300 shadow-md">
               <VegMark className="h-3 w-3 sm:h-3.5 sm:w-3.5" />

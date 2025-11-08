@@ -1,14 +1,25 @@
 import Link from "next/link"
-import { CoffeeCupIcon } from "./coffee-cup-icon"
+import Image from "next/image"
 
-export function Logo({ className = "" }: { className?: string }) {
+export function Logo({ className = "", clickable = true }: { className?: string; clickable?: boolean }) {
+  const logoImage = (
+    <Image
+      src="/kafumi-logo.png"
+      alt="Kafumi - The Essence of Every Cafe"
+      width={200}
+      height={60}
+      priority
+      className="h-10 sm:h-12 md:h-14 lg:h-16 w-auto"
+    />
+  )
+
+  if (!clickable) {
+    return <div className={`flex items-center ${className}`}>{logoImage}</div>
+  }
+
   return (
-    <Link href="/home" className={`flex items-center gap-1.5 sm:gap-2 md:gap-3 ${className}`}>
-      <CoffeeCupIcon className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12" />
-      <div className="flex flex-col">
-        <span className="text-base sm:text-xl md:text-2xl font-bold text-primary tracking-tight">KOFFISTA</span>
-        <span className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground tracking-widest uppercase hidden xs:block">Sip on a feeling</span>
-      </div>
+    <Link href="/home" className={`flex items-center ${className}`}>
+      {logoImage}
     </Link>
   )
 }

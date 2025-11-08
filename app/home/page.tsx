@@ -7,7 +7,8 @@ import { Navigation } from "@/components/navigation"
 import { CafeCard } from "@/components/cafe-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { cafes } from "@/lib/cafe-data"
+import { getCafes } from "@/lib/cafe-data-service"
+import type { Cafe } from "@/lib/types"
 import { Search, Sparkles, MapIcon, HelpCircle, Coffee, Heart, Filter } from "@/components/icons"
 import { Utensils } from "lucide-react"
 import { PageLoading } from "@/components/loading"
@@ -18,6 +19,7 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [favorites, setFavorites] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [cafes, setCafes] = useState<Cafe[]>([])
 
   useEffect(() => {
     const loadData = async () => {
@@ -27,6 +29,10 @@ export default function HomePage() {
 
         const savedFavorites = localStorage.getItem("favorites")
         if (savedFavorites) setFavorites(JSON.parse(savedFavorites))
+
+        // Fetch cafes from Google Sheets
+        const fetchedCafes = await getCafes()
+        setCafes(fetchedCafes)
       } catch (error) {
         console.error('Error loading data:', error)
       } finally {
@@ -196,9 +202,9 @@ export default function HomePage() {
         {/* About Section */}
         <section className="bg-secondary/30 rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-12 space-y-4 sm:space-y-6 md:space-y-8">
           <div className="text-center max-w-3xl mx-auto px-2">
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-serif font-bold text-foreground mb-2 sm:mb-3 md:mb-4">About Koffista</h2>
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-serif font-bold text-foreground mb-2 sm:mb-3 md:mb-4">About Kafumi</h2>
             <p className="text-sm sm:text-base md:text-lg text-muted-foreground text-balance">
-              Koffista is your personal café discovery companion. We help you find the perfect spot based on your mood,
+              Kafumi is your personal café discovery companion. We help you find the perfect spot based on your mood,
               preferences, and what you're looking for in a café experience.
             </p>
           </div>
@@ -243,7 +249,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t border-border mt-8 sm:mt-12 md:mt-16">
         <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 text-center text-muted-foreground text-xs md:text-sm">
-          <p>&copy; 2025 Koffista. Sip on a feeling.</p>
+          <p>&copy; 2025 Kafumi. The Essence of Every Cafe.</p>
         </div>
       </footer>
     </div>

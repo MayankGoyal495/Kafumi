@@ -96,7 +96,7 @@ function OTPContent() {
 
         {/* Logo */}
         <div className="text-center">
-          <Logo className="justify-center" />
+          <Logo className="justify-center" clickable={false} />
         </div>
 
         {/* OTP Card */}

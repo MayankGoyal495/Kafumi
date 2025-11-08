@@ -21,7 +21,7 @@ Your location system had several issues causing unreliable searches. Here's what
 
 1. **Start your app:**
    ```bash
-   cd /Users/mayankgoyal/Desktop/Koffista/3.Koffista
+   cd /Users/mayankgoyal/Desktop/Kafumi/3.Kafumi
    npm run dev
    ```
 

@@ -8,32 +8,37 @@ import { CafeCard } from "@/components/cafe-card"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useClientAuth } from "@/src/hooks/useClientAuth"
-import { cafes } from "@/lib/cafe-data"
+import { getCafes } from "@/lib/cafe-data-service"
+import type { Cafe } from "@/lib/types"
 import { Heart, ArrowLeft } from "lucide-react"
 
 export default function FavoritesPage() {
   const router = useRouter()
   const { user } = useClientAuth()
-  const [favoriteCafes, setFavoriteCafes] = useState([])
+  const [favoriteCafes, setFavoriteCafes] = useState<Cafe[]>([])
 
   useEffect(() => {
-    const saved = localStorage.getItem('favorites')
-    if (saved) {
-      try {
-        const favorites = JSON.parse(saved)
-        if (favorites && favorites.length > 0) {
-          const cafesData = cafes.filter(cafe => favorites.includes(cafe.id))
-          setFavoriteCafes(cafesData)
-        } else {
+    const loadFavorites = async () => {
+      const saved = localStorage.getItem('favorites')
+      if (saved) {
+        try {
+          const favorites = JSON.parse(saved)
+          if (favorites && favorites.length > 0) {
+            const allCafes = await getCafes()
+            const cafesData = allCafes.filter(cafe => favorites.includes(cafe.id))
+            setFavoriteCafes(cafesData)
+          } else {
+            setFavoriteCafes([])
+          }
+        } catch (error) {
+          console.error('Error parsing favorites:', error)
           setFavoriteCafes([])
         }
-      } catch (error) {
-        console.error('Error parsing favorites:', error)
+      } else {
         setFavoriteCafes([])
       }
-    } else {
-      setFavoriteCafes([])
     }
+    loadFavorites()
   }, [])
 
   if (!user) {

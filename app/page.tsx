@@ -12,5 +12,5 @@ export default function RootPage() {
     router.push("/landing")
   }, [router])
 
-  return <PageLoading message="Loading Koffista..." />
+  return <PageLoading message="Loading Kafumi..." />
 }

@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Koffista warm coffee theme with brown and cream colors */
+  /* Kafumi warm coffee theme with brown and cream colors */
   --background: oklch(0.96 0.01 60); /* Warm cream background */
   --foreground: oklch(0.25 0.02 40); /* Dark brown text */
   --card: oklch(0.98 0.005 60);
