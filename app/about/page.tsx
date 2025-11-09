@@ -174,7 +174,7 @@ export default function AboutPage() {
         <section className="bg-secondary/30 rounded-2xl p-8 text-center space-y-4">
           <h2 className="text-2xl font-serif font-bold text-foreground">Get in Touch</h2>
           <p className="text-muted-foreground">Have questions or suggestions? We'd love to hear from you.</p>
-          <p className="text-primary font-medium">hello@Kafumi.com</p>
+          <p className="text-primary font-medium">kafumi.official@gmail.com</p>
         </section>
       </main>
     </div>
