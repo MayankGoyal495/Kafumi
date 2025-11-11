@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { readSheet } from '@/lib/google-api';
 import { Cafe } from '@/lib/types';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 function convertGoogleDriveUrl(url: string): string {
   if (!url || url.trim() === '') return '';
   
@@ -260,6 +263,3 @@ export async function GET() {
     );
   }
 }
-
-// Cache for 5 minutes
-export const revalidate = 300;

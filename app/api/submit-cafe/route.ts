@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { appendToSheet, uploadToDrive } from '@/lib/google-api';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     console.log('=== Submit Cafe API Called ===');

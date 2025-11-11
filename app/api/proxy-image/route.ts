@@ -10,7 +10,8 @@ export const runtime = 'nodejs';
  */
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
+    // Access search params from URL object instead
+    const { searchParams } = new URL(request.url);
     const imageUrl = searchParams.get('url');
 
     if (!imageUrl) {
