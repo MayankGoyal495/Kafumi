@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 /**
  * Proxy endpoint to fetch Google Drive images server-side
  * This bypasses CORS issues and ensures images load correctly
