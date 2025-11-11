@@ -1,5 +1,4 @@
 import { haversineDistanceKm } from "@/lib/geocoding"
-import { MapplsAPI } from "@/lib/mappls-api"
 
 export interface Coordinates {
   lat: number
@@ -7,28 +6,43 @@ export interface Coordinates {
 }
 
 /**
- * Returns driving distance in km using Mappls Distance Matrix API,
+ * Returns driving distance in km using OpenRouteService when NEXT_PUBLIC_ORS_API_KEY is set,
  * otherwise falls back to straight-line haversine distance.
  */
 export async function getDistanceKm(origin: Coordinates, destination: Coordinates): Promise<number> {
+  const apiKey = process.env.NEXT_PUBLIC_ORS_API_KEY
+  if (!apiKey) {
+    return haversineDistanceKm(origin, destination)
+  }
+
   try {
-    console.log(`🚗 Calculating distance from ${origin.lat},${origin.lng} to ${destination.lat},${destination.lng}`);
-    
-    // Try Mappls Distance Matrix API first
-    const result = await MapplsAPI.calculateDistance(origin, destination);
-    
-    if (result && result.distanceKm) {
-      console.log(`✅ Mappls distance: ${result.distanceKm.toFixed(2)} km`);
-      return result.distanceKm;
+    const url = "https://api.openrouteservice.org/v2/matrix/driving-car"
+    const body = {
+      locations: [
+        [origin.lng, origin.lat],
+        [destination.lng, destination.lat],
+      ],
+      metrics: ["distance"],
+      units: "km",
     }
-    
-    // Fallback to haversine
-    console.log('⚠️ Mappls failed, using haversine fallback');
-    return haversineDistanceKm(origin, destination);
-    
-  } catch (error) {
-    console.error('Error calculating distance:', error);
-    // Fallback to haversine on error
-    return haversineDistanceKm(origin, destination);
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: apiKey,
+      },
+      body: JSON.stringify(body),
+    })
+
+    if (!res.ok) throw new Error("ORS request failed")
+    const data = await res.json()
+    const distanceKm = data?.distances?.[0]?.[1]
+    if (typeof distanceKm === "number") {
+      return distanceKm
+    }
+    return haversineDistanceKm(origin, destination)
+  } catch {
+    return haversineDistanceKm(origin, destination)
   }
 }

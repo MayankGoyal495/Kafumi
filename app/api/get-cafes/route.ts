@@ -89,24 +89,35 @@ function convertGoogleDriveUrl(url: string): string {
 
 function parseCoordinatesFromGoogleMapsLink(link: string): { lat: number; lng: number } | null {
   try {
+    if (!link || link.trim() === '') return null;
+    
     // Try to extract coordinates from various Google Maps URL formats
     const patterns = [
       /@(-?\d+\.\d+),(-?\d+\.\d+)/, // @lat,lng format
       /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/, // !3dlat!4dlng format
       /ll=(-?\d+\.\d+),(-?\d+\.\d+)/, // ll=lat,lng format
+      /q=(-?\d+\.\d+),(-?\d+\.\d+)/, // q=lat,lng format
+      /query=(-?\d+\.\d+),(-?\d+\.\d+)/, // query=lat,lng format
+      /place\/(-?\d+\.\d+),(-?\d+\.\d+)/, // place/lat,lng format
     ];
 
     for (const pattern of patterns) {
       const match = link.match(pattern);
       if (match) {
-        return {
-          lat: parseFloat(match[1]),
-          lng: parseFloat(match[2]),
-        };
+        const lat = parseFloat(match[1]);
+        const lng = parseFloat(match[2]);
+        // Validate coordinates are within reasonable bounds
+        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          console.log(`✅ Parsed coordinates from link: ${lat}, ${lng}`);
+          return { lat, lng };
+        }
       }
     }
+    
+    console.warn('⚠️ Could not parse coordinates from Google Maps link:', link.substring(0, 100));
     return null;
-  } catch {
+  } catch (error) {
+    console.error('❌ Error parsing coordinates:', error);
     return null;
   }
 }
@@ -151,7 +162,25 @@ export async function GET() {
         const photoLinks = photoLinksRaw ? photoLinksRaw.split('||').filter((link: string) => link.trim()).map(convertGoogleDriveUrl) : [];
         
         // Coordinates from Google Maps link (column F = index 5)
-        const coords = parseCoordinatesFromGoogleMapsLink(row[5] || '') || { lat: 0, lng: 0 };
+        // If parsing fails, try to use explicit lat/lng columns if they exist
+        // Check columns K (index 10) and L (index 11) for Latitude and Longitude
+        let coords = parseCoordinatesFromGoogleMapsLink(row[5] || '');
+        
+        // Fallback: Try parsing lat/lng from dedicated columns (K and L)
+        if (!coords) {
+          const lat = parseFloat(row[10]);
+          const lng = parseFloat(row[11]);
+          if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+            coords = { lat, lng };
+            console.log(`✅ Using lat/lng from columns K,L: ${lat}, ${lng}`);
+          }
+        }
+        
+        // If still no valid coords, log warning and use default (will be filtered out)
+        if (!coords) {
+          console.warn(`⚠️ No valid coordinates for cafe: ${row[0]} - will use default`);
+          coords = { lat: 0, lng: 0 };
+        }
 
         // Parse best dishes (column W = index 22)
         const best3Dishes = row[22] || '';

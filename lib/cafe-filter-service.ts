@@ -1,18 +1,20 @@
 // ============================================================================
 // CAFE FILTERING SERVICE
 // Handles 20km radius filtering and distance calculations
+// Uses OpenRouteService for driving distances, falls back to haversine
 // ============================================================================
 
 import { Cafe } from './types';
-import { MapplsAPI } from './mappls-api';
+import { getDistanceKm } from './distance';
 import { haversineDistanceKm } from './geocoding';
 
 // Configuration
 const FILTER_CONFIG = {
   DEFAULT_RADIUS_KM: 20,
-  MAX_BATCH_SIZE: 25, // Mappls API limit for distance matrix
-  USE_MAPPLS_DISTANCE: true, // Use Mappls for accurate driving distance
+  MAX_BATCH_SIZE: 25, // Process cafes in batches
+  USE_ACCURATE_DISTANCE: true, // Use ORS for accurate driving distance
   FALLBACK_TO_HAVERSINE: true,
+  PRE_FILTER_MULTIPLIER: 1.5, // Pre-filter radius multiplier for haversine
 };
 
 export interface UserLocation {
@@ -34,7 +36,7 @@ export interface CafeWithDistance extends Cafe {
 
 /**
  * Filter cafes within specified radius from user location
- * Uses Mappls Distance Matrix API for accurate driving distances
+ * Uses OpenRouteService Distance Matrix API for accurate driving distances
  * Falls back to haversine (straight-line) distance if API fails
  */
 export async function filterCafesByRadius(
@@ -52,7 +54,7 @@ export async function filterCafesByRadius(
 
   // First pass: Filter by haversine distance (quick pre-filter)
   // Use slightly larger radius to account for roads vs straight-line distance
-  const preFilterRadiusKm = radiusKm * 1.5;
+  const preFilterRadiusKm = radiusKm * FILTER_CONFIG.PRE_FILTER_MULTIPLIER;
   
   const preFilteredCafes = cafes.filter(cafe => {
     const distance = haversineDistanceKm(
@@ -68,10 +70,10 @@ export async function filterCafesByRadius(
     return [];
   }
 
-  // Second pass: Get accurate driving distances using Mappls
+  // Second pass: Get accurate driving distances
   let cafesWithDistance: CafeWithDistance[];
 
-  if (FILTER_CONFIG.USE_MAPPLS_DISTANCE) {
+  if (FILTER_CONFIG.USE_ACCURATE_DISTANCE) {
     cafesWithDistance = await calculateAccurateDistances(preFilteredCafes, userLocation);
   } else {
     // Use haversine only
@@ -114,79 +116,77 @@ async function calculateAccurateDistances(
 ): Promise<CafeWithDistance[]> {
   console.log(`🚗 Calculating accurate driving distances for ${cafes.length} cafes...`);
 
-  // Process in batches to respect API limits
+  const origin = { lat: userLocation.lat, lng: userLocation.lng };
+  
+  // Process cafes concurrently with a reasonable limit
+  const allResults: CafeWithDistance[] = [];
+  
+  // Process in batches to avoid overwhelming the system
   const batches: Cafe[][] = [];
   for (let i = 0; i < cafes.length; i += FILTER_CONFIG.MAX_BATCH_SIZE) {
     batches.push(cafes.slice(i, i + FILTER_CONFIG.MAX_BATCH_SIZE));
   }
-
-  const allResults: CafeWithDistance[] = [];
 
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
     console.log(`  Processing batch ${i + 1}/${batches.length} (${batch.length} cafes)`);
 
     try {
-      // Prepare origins (user location) and destinations (cafe locations)
-      const origins = [{ lat: userLocation.lat, lng: userLocation.lng }];
-      const destinations = batch.map(cafe => ({
-        lat: cafe.location.coordinates.lat,
-        lng: cafe.location.coordinates.lng,
-      }));
+      // Calculate distances for all cafes in this batch concurrently
+      const results = await Promise.all(
+        batch.map(async (cafe) => {
+          try {
+            const destination = {
+              lat: cafe.location.coordinates.lat,
+              lng: cafe.location.coordinates.lng,
+            };
 
-      // Call Mappls Distance Matrix API
-      const distanceResult = await MapplsAPI.distanceMatrix(origins, destinations);
+            // Use the getDistanceKm function which handles ORS or fallback
+            const distanceKm = await getDistanceKm(origin, destination);
 
-      if (distanceResult && distanceResult.distances[0]) {
-        // Success: Use Mappls distances
-        const distances = distanceResult.distances[0];
-        const durations = distanceResult.durations[0];
+            return {
+              ...cafe,
+              distanceKm,
+              distanceLabel: formatDistance(distanceKm),
+            };
+          } catch (error) {
+            // If individual cafe fails, use haversine fallback
+            console.warn(`  ⚠️ Distance calculation failed for ${cafe.name}, using haversine`);
+            const distanceKm = haversineDistanceKm(origin, {
+              lat: cafe.location.coordinates.lat,
+              lng: cafe.location.coordinates.lng,
+            });
+            return {
+              ...cafe,
+              distanceKm,
+              distanceLabel: formatDistance(distanceKm),
+            };
+          }
+        })
+      );
 
-        batch.forEach((cafe, index) => {
-          allResults.push({
-            ...cafe,
-            distanceKm: distances[index],
-            durationMinutes: durations[index],
-            distanceLabel: formatDistance(distances[index]),
-          });
-        });
+      allResults.push(...results);
+      console.log(`  ✅ Batch ${i + 1} complete`);
 
-        console.log(`  ✅ Batch ${i + 1} complete (Mappls distances)`);
-      } else {
-        // Fallback to haversine
-        console.log(`  ⚠️ Mappls API failed for batch ${i + 1}, using haversine`);
-        batch.forEach(cafe => {
-          const distanceKm = haversineDistanceKm(
-            { lat: userLocation.lat, lng: userLocation.lng },
-            { lat: cafe.location.coordinates.lat, lng: cafe.location.coordinates.lng }
-          );
-          allResults.push({
-            ...cafe,
-            distanceKm,
-            distanceLabel: formatDistance(distanceKm),
-          });
-        });
+      // Add small delay between batches to avoid rate limiting
+      if (i < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
     } catch (error) {
       console.error(`  ❌ Error in batch ${i + 1}:`, error);
       
-      // Fallback to haversine for this batch
+      // Fallback to haversine for this entire batch
       batch.forEach(cafe => {
-        const distanceKm = haversineDistanceKm(
-          { lat: userLocation.lat, lng: userLocation.lng },
-          { lat: cafe.location.coordinates.lat, lng: cafe.location.coordinates.lng }
-        );
+        const distanceKm = haversineDistanceKm(origin, {
+          lat: cafe.location.coordinates.lat,
+          lng: cafe.location.coordinates.lng,
+        });
         allResults.push({
           ...cafe,
           distanceKm,
           distanceLabel: formatDistance(distanceKm),
         });
       });
-    }
-
-    // Add small delay between batches to avoid rate limiting
-    if (i < batches.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 500));
     }
   }
 
@@ -234,7 +234,7 @@ export function getCafeDistance(
 }
 
 /**
- * Calculate distance to a single cafe with Mappls
+ * Calculate distance to a single cafe with accurate routing
  */
 export async function getCafeDistanceAccurate(
   cafe: Cafe,
@@ -245,28 +245,25 @@ export async function getCafeDistanceAccurate(
   distanceLabel: string;
 }> {
   try {
-    const result = await MapplsAPI.calculateDistance(
+    const distanceKm = await getDistanceKm(
       { lat: userLocation.lat, lng: userLocation.lng },
       { lat: cafe.location.coordinates.lat, lng: cafe.location.coordinates.lng }
     );
 
-    if (result) {
-      return {
-        distanceKm: result.distanceKm,
-        durationMinutes: result.durationMinutes,
-        distanceLabel: formatDistance(result.distanceKm),
-      };
-    }
+    return {
+      distanceKm,
+      distanceLabel: formatDistance(distanceKm),
+    };
   } catch (error) {
-    console.error('Mappls distance calculation failed, using haversine:', error);
+    console.error('Distance calculation failed, using haversine:', error);
+    
+    // Fallback
+    const distanceKm = getCafeDistance(cafe, userLocation);
+    return {
+      distanceKm,
+      distanceLabel: formatDistance(distanceKm),
+    };
   }
-
-  // Fallback
-  const distanceKm = getCafeDistance(cafe, userLocation);
-  return {
-    distanceKm,
-    distanceLabel: formatDistance(distanceKm),
-  };
 }
 
 // ============================================================================

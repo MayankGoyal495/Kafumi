@@ -18,7 +18,7 @@ export function Header({ location, onLocationClick }: HeaderProps) {
         {location && (
           <Button variant="ghost" className="flex items-center gap-1 sm:gap-1.5 md:gap-2 h-8 sm:h-9 md:h-10 px-2 sm:px-3" onClick={onLocationClick}>
             <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            <span className="text-xs sm:text-sm md:text-base truncate max-w-[80px] sm:max-w-none">{location}</span>
+            <span className="text-xs sm:text-sm md:text-base truncate max-w-[80px] sm:max-w-[120px] md:max-w-[150px]">{location}</span>
           </Button>
         )}
       </div>

@@ -6,9 +6,10 @@ import { Logo } from "@/components/logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
-import { MapPin, Navigation, Search, ChevronDown, AlertCircle, Loader2, Sparkles } from "lucide-react"
-import { MapplsAPI } from "@/lib/mappls-api"
-import type { MapplsLocation } from "@/lib/mappls-api"
+import { MapPin, Navigation, Search, ChevronDown, AlertCircle, Loader2, Sparkles, Lightbulb } from "lucide-react"
+import { reverseGeocodeToCity, geocodeCityToCoords, searchLocationsEnhanced, geocodeWithNominatim } from "@/lib/geocoding"
+import { GeminiLocationAI } from "@/lib/gemini-location-ai"
+import { LocationNotFoundDialog } from "@/components/location-not-found-dialog"
 import { useDebounce } from "@/hooks/useDebounce"
 
 export default function LocationPage() {
@@ -17,8 +18,23 @@ export default function LocationPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isDetectingManual, setIsDetectingManual] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
-  const [searchResults, setSearchResults] = useState<MapplsLocation[]>([])
+  const [searchResults, setSearchResults] = useState<Array<{ 
+    name: string; 
+    address: string; 
+    city: string; 
+    state: string; 
+    country: string;
+    lat: number;
+    lng: number;
+    source?: string;
+  }>>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [showLocationNotFound, setShowLocationNotFound] = useState(false)
+  const [failedSearchQuery, setFailedSearchQuery] = useState("")
+  const [isDetectingFallback, setIsDetectingFallback] = useState(false)
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
+  const [locationContext, setLocationContext] = useState<string>("")
+  const [typoCorrection, setTypoCorrection] = useState<string>("")
   const [gpsError, setGpsError] = useState<string>("")
   const [showGpsError, setShowGpsError] = useState(false)
   
@@ -29,6 +45,9 @@ export default function LocationPage() {
     console.log('📍 GPS Error Details:', {
       code: error.code,
       message: error.message,
+      PERMISSION_DENIED: error.PERMISSION_DENIED,
+      POSITION_UNAVAILABLE: error.POSITION_UNAVAILABLE,
+      TIMEOUT: error.TIMEOUT
     });
     
     switch (error.code) {
@@ -55,13 +74,10 @@ export default function LocationPage() {
             const { latitude, longitude } = position.coords
             console.log(`📍 Device location: ${latitude}, ${longitude}`)
             
-            // Use Mappls Reverse Geocode
-            const result = await MapplsAPI.reverseGeocode(latitude, longitude)
+            const city = await reverseGeocodeToCity(latitude, longitude)
+            const locationValue = city || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
             
-            const locationValue = result?.city || result?.locality || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
-            const addressValue = result?.formattedAddress || locationValue
-            
-            localStorage.setItem("userLocation", addressValue)
+            localStorage.setItem("userLocation", locationValue)
             localStorage.setItem("userCoords", JSON.stringify({ lat: latitude, lng: longitude }))
             
             console.log(`✅ Location saved: ${locationValue}`)
@@ -83,9 +99,9 @@ export default function LocationPage() {
           setShowGpsError(true)
         },
         { 
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 30000
+          enableHighAccuracy: false,  // ✅ Changed to false for better compatibility
+          timeout: 15000,  // ✅ Increased to 15s for reliability
+          maximumAge: 30000  // ✅ Allow 30s old position
         },
       )
     } else {
@@ -104,12 +120,8 @@ export default function LocationPage() {
         async (position) => {
           try {
             const { latitude, longitude } = position.coords
-            
-            // Use Mappls Reverse Geocode
-            const result = await MapplsAPI.reverseGeocode(latitude, longitude)
-            
-            const locationValue = result?.city || result?.locality || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
-            
+            const city = await reverseGeocodeToCity(latitude, longitude)
+            const locationValue = city || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
             setManualLocation(locationValue)
             localStorage.setItem("userCoords", JSON.stringify({ lat: latitude, lng: longitude }))
           } catch (err) {
@@ -128,7 +140,7 @@ export default function LocationPage() {
           setShowGpsError(true)
         },
         { 
-          enableHighAccuracy: true,
+          enableHighAccuracy: false,
           timeout: 15000,
           maximumAge: 30000
         },
@@ -147,67 +159,91 @@ export default function LocationPage() {
     try {
       console.log(`🔍 Starting location search for: ${manualLocation}`);
       
-      // Try Mappls Geocode
-      const geocodeResult = await MapplsAPI.geocode(manualLocation.trim())
+      // Try Gemini AI typo correction first
+      const correction = await GeminiLocationAI.correctLocationTypo(manualLocation).catch(() => null);
+      let queryToSearch = manualLocation;
       
-      if (geocodeResult) {
-        console.log('✅ Using Mappls geocode result:', geocodeResult);
+      if (correction && correction.corrected !== manualLocation && correction.confidence > 0.7) {
+        console.log(`🤖 Gemini corrected "${manualLocation}" to "${correction.corrected}"`);
+        queryToSearch = correction.corrected;
+        setTypoCorrection(correction.corrected);
+      }
+      
+      // Try enhanced search
+      const searchResults = await searchLocationsEnhanced(queryToSearch);
+      
+      if (searchResults && searchResults.length > 0) {
+        const bestResult = searchResults[0];
+        console.log('✅ Using search result:', bestResult);
         
         localStorage.setItem("userCoords", JSON.stringify({ 
-          lat: geocodeResult.lat, 
-          lng: geocodeResult.lng 
+          lat: bestResult.lat, 
+          lng: bestResult.lng 
         }));
-        localStorage.setItem("userLocation", geocodeResult.formattedAddress || geocodeResult.city);
+        localStorage.setItem("userLocation", bestResult.address || bestResult.name);
         router.push("/discover");
         return;
       }
       
-      console.log('⚠️ Mappls geocode failed, trying autosuggest...');
+      console.log('⚠️ Enhanced search returned no results, trying fallbacks...');
       
-      // Fallback: Try autosuggest
-      const suggestions = await MapplsAPI.autosuggest(manualLocation.trim())
-      
-      if (suggestions && suggestions.length > 0) {
-        const first = suggestions[0]
-        console.log('✅ Using first autosuggest result:', first);
-        
+      // Fallback: Try Nominatim directly
+      const nominatimResult = await geocodeWithNominatim(queryToSearch);
+      if (nominatimResult) {
+        console.log('✅ Using Nominatim fallback:', nominatimResult);
         localStorage.setItem("userCoords", JSON.stringify({ 
-          lat: first.latitude, 
-          lng: first.longitude 
+          lat: nominatimResult.lat, 
+          lng: nominatimResult.lng 
         }));
-        localStorage.setItem("userLocation", first.placeAddress || first.placeName);
+        localStorage.setItem("userLocation", nominatimResult.address);
         router.push("/discover");
         return;
       }
       
-      // All attempts failed
-      console.log('❌ All Mappls searches failed');
-      setGpsError(`Could not find "${manualLocation}" in India. Please try: City name, landmark, or area (e.g., "Koramangala Bangalore", "Connaught Place Delhi").`);
-      setShowGpsError(true);
+      // Final fallback: Try BigDataCloud
+      const coords = await geocodeCityToCoords(queryToSearch);
+      if (coords) {
+        console.log('✅ Using BigDataCloud fallback:', coords);
+        localStorage.setItem("userCoords", JSON.stringify(coords));
+        localStorage.setItem("userLocation", queryToSearch);
+        router.push("/discover");
+        return;
+      }
+      
+      // All attempts failed - show dialog
+      console.log('❌ All geocoding attempts failed');
+      setFailedSearchQuery(manualLocation);
+      setShowLocationNotFound(true);
       
     } catch (err) {
-      console.error("Error searching location:", err);
-      setGpsError("Search failed. Please check your internet connection and try again.");
-      setShowGpsError(true);
+      console.error("Error geocoding location:", err);
+      setFailedSearchQuery(manualLocation);
+      setShowLocationNotFound(true);
     } finally {
       setIsLoading(false);
     }
   }
 
-  const handleLocationSelect = async (location: MapplsLocation) => {
-    const locationString = location.placeAddress || location.placeName
+  const handleLocationSelect = async (location: { 
+    name: string; 
+    address: string; 
+    city: string; 
+    state: string; 
+    country: string;
+    lat: number;
+    lng: number;
+    source?: string;
+  }) => {
+    const locationString = location.address || `${location.name}, ${location.city}, ${location.state}`
     setManualLocation(locationString)
     setShowDropdown(false)
     setSearchResults([])
     
     setIsLoading(true)
     try {
-      console.log(`✅ Selected location from Mappls:`, location);
+      console.log(`✅ Selected location from ${location.source}:`, location);
       
-      localStorage.setItem("userCoords", JSON.stringify({ 
-        lat: location.latitude, 
-        lng: location.longitude 
-      }))
+      localStorage.setItem("userCoords", JSON.stringify({ lat: location.lat, lng: location.lng }))
       localStorage.setItem("userLocation", locationString)
       router.push("/discover")
     } catch (err) {
@@ -223,24 +259,40 @@ export default function LocationPage() {
     if (query.length < 2) {
       setSearchResults([])
       setShowDropdown(false)
+      setAiSuggestions([])
+      setLocationContext("")
       return
     }
 
     setIsSearching(true)
     try {
-      console.log(`🔍 Searching with Mappls: ${query}`);
+      console.log(`🔍 Searching for: ${query}`);
       
-      // Use Mappls Autosuggest
-      const results = await MapplsAPI.autosuggest(query)
+      // Run geocoding and AI suggestions in parallel
+      const [geocodeResults, aiSuggestionsResult] = await Promise.all([
+        searchLocationsEnhanced(query),
+        GeminiLocationAI.generateSearchSuggestions(query).catch(() => [])
+      ]);
       
-      console.log(`📍 Found ${results.length} Mappls results`);
+      console.log(`📍 Found ${geocodeResults.length} geocoding results`);
+      console.log(`🤖 Got ${aiSuggestionsResult.length} AI suggestions`);
       
-      setSearchResults(results)
+      setSearchResults(geocodeResults)
+      setAiSuggestions(aiSuggestionsResult)
       setShowDropdown(true)
+      
+      // Get location context for the first result
+      if (geocodeResults.length > 0) {
+        const context = await GeminiLocationAI.getLocationContext(geocodeResults[0].name).catch(() => null);
+        if (context) {
+          setLocationContext(context);
+        }
+      }
       
     } catch (err) {
       console.error("Error searching locations:", err)
       setSearchResults([])
+      setAiSuggestions([])
       setShowDropdown(true)
     } finally {
       setIsSearching(false)
@@ -250,6 +302,7 @@ export default function LocationPage() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     setManualLocation(value)
+    setTypoCorrection("")
     
     // Show dropdown immediately but search will be debounced
     if (value.length >= 2) {
@@ -258,7 +311,16 @@ export default function LocationPage() {
     } else {
       setShowDropdown(false)
       setSearchResults([])
+      setAiSuggestions([])
+      setLocationContext("")
     }
+  }
+
+  const handleAiSuggestionClick = (suggestion: string) => {
+    setManualLocation(suggestion)
+    setShowDropdown(false)
+    // Trigger search with the suggestion
+    setTimeout(() => handleLocationSearch(suggestion), 100)
   }
 
   // Effect to handle debounced search
@@ -267,6 +329,74 @@ export default function LocationPage() {
       handleLocationSearch(debouncedSearchQuery)
     }
   }, [debouncedSearchQuery])
+
+  // Dialog handlers for location not found
+  const handleUseCurrentLocationFallback = () => {
+    setIsDetectingFallback(true)
+    setGpsError("")
+    
+    if (typeof navigator !== "undefined" && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords
+            const city = await reverseGeocodeToCity(latitude, longitude)
+            const locationValue = city || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+            localStorage.setItem("userLocation", locationValue)
+            localStorage.setItem("userCoords", JSON.stringify({ lat: latitude, lng: longitude }))
+            setShowLocationNotFound(false)
+            router.push("/discover")
+          } catch (err) {
+            console.error("Reverse geocoding failed", err)
+            localStorage.setItem("userCoords", JSON.stringify({ lat: position.coords.latitude, lng: position.coords.longitude }))
+            localStorage.setItem("userLocation", `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`)
+            setShowLocationNotFound(false)
+            router.push("/discover")
+          } finally {
+            setIsDetectingFallback(false)
+          }
+        },
+        (error) => {
+          console.error("Error getting location:", error)
+          setIsDetectingFallback(false)
+          const errorMessage = getGPSErrorMessage(error)
+          setGpsError(errorMessage)
+          setShowGpsError(true)
+          setShowLocationNotFound(false)
+        },
+        { 
+          enableHighAccuracy: false,
+          timeout: 15000,
+          maximumAge: 30000
+        },
+      )
+    } else {
+      setIsDetectingFallback(false)
+      setGpsError("Geolocation is not supported by your browser")
+      setShowGpsError(true)
+      setShowLocationNotFound(false)
+    }
+  }
+
+  const handleTryAgain = () => {
+    setShowLocationNotFound(false)
+    setManualLocation("")
+    setSearchResults([])
+    setAiSuggestions([])
+    setLocationContext("")
+    setTimeout(() => {
+      const input = document.querySelector('input[type="text"]') as HTMLInputElement
+      if (input) {
+        input.focus()
+      }
+    }, 100)
+  }
+
+  const handleContinueAnyway = () => {
+    localStorage.setItem("userLocation", failedSearchQuery)
+    setShowLocationNotFound(false)
+    router.push("/discover")
+  }
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -298,9 +428,7 @@ export default function LocationPage() {
               <h1 className="text-xl sm:text-2xl font-serif font-bold text-foreground text-balance">
                 Where should we find cafés for you?
               </h1>
-              <p className="text-sm sm:text-base text-muted-foreground">
-                Powered by Mappls • India's most accurate maps
-              </p>
+              <p className="text-sm sm:text-base text-muted-foreground">Help us discover the perfect spots nearby</p>
             </div>
 
             {/* GPS Error Alert */}
@@ -356,19 +484,29 @@ export default function LocationPage() {
               <div className="space-y-1">
                 <label className="text-sm font-medium text-foreground flex items-center gap-2">
                   Enter Location Manually
-                  <Sparkles className="h-3 w-3 text-blue-500" />
+                  <Sparkles className="h-3 w-3 text-purple-500" />
                 </label>
                 <p className="text-xs text-muted-foreground">
-                  Mappls-powered • All of India • Most accurate
+                  AI-powered search • India locations only
                 </p>
               </div>
+
+              {/* Typo Correction Banner */}
+              {typoCorrection && (
+                <div className="bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg p-2 text-xs flex items-center gap-2">
+                  <Sparkles className="h-3 w-3 text-purple-500 flex-shrink-0" />
+                  <span className="text-purple-700 dark:text-purple-300">
+                    Searching for: <strong>{typoCorrection}</strong>
+                  </span>
+                </div>
+              )}
 
               <div className="relative location-dropdown-container">
                 <div className="relative">
                   <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="text"
-                    placeholder="e.g., Koramangala Bangalore, CP Delhi, Marine Drive Mumbai"
+                    placeholder="e.g., Koramangala, Connaught Place, Mumbai"
                     value={manualLocation}
                     onChange={handleInputChange}
                     onFocus={() => {
@@ -389,37 +527,85 @@ export default function LocationPage() {
                       {isSearching ? (
                         <div className="px-2 py-3 text-sm text-muted-foreground flex items-center gap-2">
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Searching with Mappls...
+                          Searching with AI...
                         </div>
-                      ) : searchResults.length > 0 ? (
+                      ) : (
                         <>
-                          <div className="text-xs font-medium text-muted-foreground mb-2 px-2">
-                            Found {searchResults.length} location{searchResults.length !== 1 ? 's' : ''} in India
-                          </div>
-                          {searchResults.map((location, index) => (
-                            <button
-                              key={`${location.eLoc}-${index}`}
-                              onClick={() => handleLocationSelect(location)}
-                              className="w-full text-left px-2 py-3 text-sm hover:bg-secondary rounded flex flex-col gap-1 transition-colors"
-                            >
-                              <div className="flex items-center gap-2">
-                                <MapPin className="h-3 w-3 text-primary flex-shrink-0" />
-                                <span className="font-medium">{location.placeName}</span>
-                                <span className="text-xs text-muted-foreground ml-auto capitalize">
-                                  {location.type}
-                                </span>
+                          {/* AI Suggestions Section */}
+                          {aiSuggestions.length > 0 && (
+                            <div className="mb-2">
+                              <div className="text-xs font-medium text-purple-600 dark:text-purple-400 mb-2 px-2 flex items-center gap-1">
+                                <Sparkles className="h-3 w-3" />
+                                AI Suggestions
                               </div>
-                              <div className="text-xs text-muted-foreground ml-5 line-clamp-1">
-                                {location.placeAddress}
+                              {aiSuggestions.map((suggestion, index) => (
+                                <button
+                                  key={`ai-${index}`}
+                                  onClick={() => handleAiSuggestionClick(suggestion)}
+                                  className="w-full text-left px-2 py-2 text-sm hover:bg-purple-50 dark:hover:bg-purple-950/20 rounded flex items-center gap-2 transition-colors"
+                                >
+                                  <Lightbulb className="h-3 w-3 text-purple-500 flex-shrink-0" />
+                                  <span>{suggestion}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Geocoding Results Section */}
+                          {searchResults.length > 0 ? (
+                            <>
+                              <div className="text-xs font-medium text-muted-foreground mb-2 px-2 border-t border-border pt-2 mt-2">
+                                Found {searchResults.length} location{searchResults.length !== 1 ? 's' : ''} in India
                               </div>
-                            </button>
-                          ))}
+                              {searchResults.map((location, index) => (
+                                <button
+                                  key={index}
+                                  onClick={() => handleLocationSelect(location)}
+                                  className="w-full text-left px-2 py-3 text-sm hover:bg-secondary rounded flex flex-col gap-1 transition-colors"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                    <span className="font-medium">{location.name}</span>
+                                    {location.source && (
+                                      <span className="text-xs text-muted-foreground ml-auto">
+                                        via {location.source}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground ml-5 line-clamp-1">
+                                    {location.address}
+                                  </div>
+                                </button>
+                              ))}
+                              
+                              {/* Location Context */}
+                              {locationContext && (
+                                <div className="mt-2 px-2 py-2 bg-blue-50 dark:bg-blue-950/20 rounded text-xs text-blue-700 dark:text-blue-300 flex gap-2">
+                                  <Sparkles className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                                  <span>{locationContext}</span>
+                                </div>
+                              )}
+                            </>
+                          ) : manualLocation.length >= 2 && !isSearching && aiSuggestions.length === 0 ? (
+                            <div className="px-2 py-3 space-y-2">
+                              <div className="text-sm text-muted-foreground">
+                                No locations found in India for "{manualLocation}"
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setFailedSearchQuery(manualLocation)
+                                  setShowLocationNotFound(true)
+                                  setShowDropdown(false)
+                                }}
+                                className="w-full text-left px-2 py-2 text-xs bg-muted/50 hover:bg-muted rounded flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                <AlertCircle className="h-3 w-3" />
+                                Need help finding this location?
+                              </button>
+                            </div>
+                          ) : null}
                         </>
-                      ) : manualLocation.length >= 2 && !isSearching ? (
-                        <div className="px-2 py-3 text-sm text-muted-foreground">
-                          No locations found in India for "{manualLocation}"
-                        </div>
-                      ) : null}
+                      )}
                     </div>
                   </div>
                 )}
@@ -463,12 +649,23 @@ export default function LocationPage() {
         {/* Helpful Tips */}
         <div className="text-center text-xs text-muted-foreground space-y-1">
           <p className="flex items-center justify-center gap-1">
-            <Sparkles className="h-3 w-3 text-blue-500" />
-            Powered by Mappls • Most accurate • India-only locations
+            <Sparkles className="h-3 w-3 text-purple-500" />
+            AI-powered search • India locations only • Smart typo correction
           </p>
-          <p>Try: "Koramangala", "Connaught Place", "Marine Drive"</p>
+          <p>e.g., "mg road blr" or "cp delhi" works perfectly!</p>
         </div>
       </div>
+
+      {/* Location Not Found Dialog */}
+      <LocationNotFoundDialog
+        isOpen={showLocationNotFound}
+        searchQuery={failedSearchQuery}
+        onClose={() => setShowLocationNotFound(false)}
+        onUseCurrentLocation={handleUseCurrentLocationFallback}
+        onTryAgain={handleTryAgain}
+        onContinueAnyway={handleContinueAnyway}
+        isDetecting={isDetectingFallback}
+      />
     </div>
   )
 }
