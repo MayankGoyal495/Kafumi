@@ -193,15 +193,6 @@ export async function GET() {
         const coverImageRaw = row[23] || '';
         const coverImage = convertGoogleDriveUrl(coverImageRaw);
         
-        // Debug: Log first cafe's image conversion for troubleshooting
-        if (index === 0) {
-          console.log('=== First Cafe Image Debug ===');
-          console.log('Raw cover image URL:', coverImageRaw);
-          console.log('Converted cover image URL:', coverImage);
-          console.log('Raw photo links:', photoLinksRaw);
-          console.log('Converted photo links:', photoLinks);
-        }
-        
         // Ensure we always have a valid image URL
         const validCoverImage = (coverImage && coverImage.trim() !== '') ? coverImage : '/placeholder.jpg';
         const validPhotoLinks = photoLinks.filter((link: string) => link && link.trim() !== '');
@@ -210,6 +201,21 @@ export async function GET() {
         const allImages = validCoverImage !== '/placeholder.jpg' 
           ? [validCoverImage, ...validPhotoLinks]
           : (validPhotoLinks.length > 0 ? validPhotoLinks : ['/placeholder.jpg']);
+        
+        // Debug: Log first cafe's image conversion for troubleshooting
+        if (index === 0) {
+          console.log('=== First Approved Cafe Image Debug ===');
+          console.log('Cafe name:', row[0]);
+          console.log('Raw cover image URL (Column X):', coverImageRaw);
+          console.log('Converted cover image URL:', coverImage);
+          console.log('Valid cover image:', validCoverImage);
+          console.log('Raw photo links (Column Y):', photoLinksRaw);
+          console.log('Converted photo links:', photoLinks);
+          console.log('Valid photo links:', validPhotoLinks);
+          console.log('Final images array:', allImages);
+          console.log('Google Maps Link (Column F):', row[5]);
+          console.log('Parsed coordinates:', coords);
+        }
 
         const cafe: Cafe = {
           id: `cafe_${index + 1}`,

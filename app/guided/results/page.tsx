@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Navigation } from "@/components/navigation"
@@ -99,6 +98,18 @@ export default function GuidedResultsPage() {
   const topThreeCafes = recommendedCafes.slice(1, 4)
   const moreCafes = recommendedCafes.slice(4, 8)
 
+  // Show loading state while cafes are being fetched
+  if (recommendedCafes.length === 0) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">Finding perfect cafés for you...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Top Navigation Bar */}
@@ -140,6 +151,7 @@ export default function GuidedResultsPage() {
           </div>
 
           {/* Featured Café - Full Width Banner */}
+          {featuredCafe && (
           <section className="space-y-4">
             <h2 className="text-2xl font-serif font-bold text-foreground flex items-center gap-2">
               <Star className="h-6 w-6 fill-yellow-500 text-yellow-500" />
@@ -149,14 +161,31 @@ export default function GuidedResultsPage() {
             <Card className="overflow-hidden hover:shadow-xl transition-all border-primary/30">
               <div className="grid md:grid-cols-2 gap-0">
                 {/* Image */}
-                <div className="relative h-64 md:h-96">
-                  <Image
-                    src={featuredCafe.image || "/placeholder.svg"}
-                    alt={featuredCafe.name}
-                    fill
-                    className="object-cover"
-                    priority
-                  />
+                <div className="relative h-64 md:h-96 bg-muted">
+                  {(() => {
+                    let imageSrc = !featuredCafe.image || featuredCafe.image.trim() === '' || featuredCafe.image.includes('placeholder')
+                      ? '/placeholder.jpg'
+                      : featuredCafe.image;
+                    
+                    // Use proxy for Google Drive URLs
+                    if (imageSrc.includes('drive.google.com') && imageSrc !== '/placeholder.jpg') {
+                      imageSrc = `/api/proxy-image?url=${encodeURIComponent(imageSrc)}`;
+                    }
+                    
+                    return (
+                      <img
+                        src={imageSrc}
+                        alt={featuredCafe.name}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          if (e.currentTarget.src !== window.location.origin + '/placeholder.jpg') {
+                            e.currentTarget.src = '/placeholder.jpg';
+                          }
+                        }}
+                      />
+                    );
+                  })()}
                   {featuredCafe.type === "Veg" && (
                     <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full text-sm font-semibold bg-white text-emerald-700 border border-emerald-300 shadow-sm">
                       Pure Veg
@@ -231,8 +260,10 @@ export default function GuidedResultsPage() {
               </div>
             </Card>
           </section>
+          )}
 
           {/* Top 3 Recommendations */}
+          {topThreeCafes.length > 0 && (
           <section className="space-y-4">
             <h2 className="text-2xl font-serif font-bold text-foreground">More Great Matches</h2>
             <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
@@ -249,14 +280,31 @@ export default function GuidedResultsPage() {
                       </div>
                     )}
                     <Link href={`/cafe/${cafe.id}`}>
-                      <div className="relative h-48 md:h-52 w-full overflow-hidden -mb-2">
-                        <Image 
-                          src={cafe.image || "/placeholder.svg"} 
-                          alt={cafe.name} 
-                          fill 
-                          className="object-cover group-hover:scale-105 transition-transform duration-300" 
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        />
+                      <div className="relative h-48 md:h-52 w-full overflow-hidden -mb-2 bg-muted">
+                        {(() => {
+                          let imageSrc = !cafe.image || cafe.image.trim() === '' || cafe.image.includes('placeholder')
+                            ? '/placeholder.jpg'
+                            : cafe.image;
+                          
+                          // Use proxy for Google Drive URLs
+                          if (imageSrc.includes('drive.google.com') && imageSrc !== '/placeholder.jpg') {
+                            imageSrc = `/api/proxy-image?url=${encodeURIComponent(imageSrc)}`;
+                          }
+                          
+                          return (
+                            <img
+                              src={imageSrc}
+                              alt={cafe.name}
+                              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => {
+                                if (e.currentTarget.src !== window.location.origin + '/placeholder.jpg') {
+                                  e.currentTarget.src = '/placeholder.jpg';
+                                }
+                              }}
+                            />
+                          );
+                        })()}
                         {cafe.type === 'Veg' && (
                           <div className="absolute top-3 right-3 px-2.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-300 shadow-md">
                             <span className="text-emerald-600">●</span>
@@ -361,6 +409,7 @@ export default function GuidedResultsPage() {
               })}
             </div>
           </section>
+          )}
 
           {/* Locked Content for Non-Logged In Users */}
           {!isLoggedIn && moreCafes.length > 0 && (

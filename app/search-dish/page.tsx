@@ -127,12 +127,12 @@ export default function SearchDishPage() {
   ]
   
   const vibeOptions = [
-    "Aesthetic & Instagrammable",
-    "Green/Nature", 
-    "Modern/Trendy",
-    "Music & Live Events",
+    "Aesthetic & Photogenic",
+    "Green & Serene", 
+    "Modern & Energetic",
+    "Musical & Lively",
     "Quiet & Peaceful",
-    "Rooftop/Open-air",
+    "Rooftop & Breezy",
   ]
   
   const sortOptions = [

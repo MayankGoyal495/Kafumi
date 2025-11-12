@@ -12,8 +12,8 @@ export const cafes: Cafe[] = [
     reviewCount: 342,
     image: "/cozy-modern-cafe-interior-with-plants.jpg",
     images: ["/cozy-modern-cafe-interior-with-plants.jpg", "/cafe-latte-art-coffee.jpg", "/cafe-pastries-display.jpg"],
-    vibe: ["Quiet & Peaceful", "Aesthetic & Instagrammable", "Green/Nature"],
-    purpose: ["Work / Study Alone", "Hangout with Friends"],
+    vibe: ["Quiet & Peaceful", "Aesthetic & Photogenic", "Green & Serene"],
+    purpose: ["Me-Time & Relax", "Hangout with Friends"],
     amenities: ["Free Wi-Fi", "Charging Ports", "Outdoor Seating"],
     bestDish: "Caramel Macchiato & Blueberry Scone",
     priceRange: "Moderate – ₹300–₹600",
@@ -73,16 +73,16 @@ export const cafes: Cafe[] = [
     reviewCount: 567,
     image: "/rooftop-cafe-restaurant-city-view-evening.jpg",
     images: ["/rooftop-cafe-restaurant-city-view-evening.jpg", "/rooftop-dining-table-setup.jpg", "/live-music-performance-cafe.jpg"],
-    vibe: ["Rooftop/Open-air", "Music & Live Events", "Modern/Trendy"],
-    purpose: ["Romantic Date", "Fun Night Out"],
+    vibe: ["Rooftop & Breezy", "Musical & Lively", "Modern & Energetic"],
+    purpose: ["Date & Dine", "Music & Night Out"],
     amenities: ["Outdoor Seating", "Parking", "Free Wi-Fi"],
     bestDish: "Grilled Chicken Platter & Mojito",
     priceRange: "Premium – ₹900+",
     pricePerPerson: 750,
-    foodDrinkTypes: ["All-rounder Menu", "Alcoholic Drinks", "Fine Dining", "Desserts & Bakery", "Coffee & Beverages"],
+    foodDrinkTypes: ["Global Café Bites", "Cocktails & Spirits", "Indian & Comfort Meals", "Desserts & Bakery", "Coffee & Beverages"],
     menuCategories: [
       {
-        name: "All-rounder Menu",
+        name: "Global Café Bites",
         items: [
           { name: "Grilled Chicken Platter", price: 450, dietaryType: "non-veg" },
           { name: "Margherita Pizza", price: 380, dietaryType: "veg" },
@@ -90,7 +90,7 @@ export const cafes: Cafe[] = [
         ],
       },
       {
-        name: "Alcoholic Drinks",
+        name: "Cocktails & Spirits",
         items: [
           { name: "Mojito", price: 250, dietaryType: "veg" },
           { name: "Beer", price: 300, dietaryType: "veg" },
@@ -114,7 +114,7 @@ export const cafes: Cafe[] = [
       {
         userName: "Ananya K.",
         rating: 5,
-        text: "Amazing ambiance! Perfect for a fun night out with friends.",
+        text: "Amazing ambiance! Perfect for a Music & Night Out with friends.",
         date: "2025-09-20",
       },
     ],
@@ -130,7 +130,7 @@ export const cafes: Cafe[] = [
     reviewCount: 289,
     image: "/garden-cafe-with-plants-outdoor-seating.jpg",
     images: ["/garden-cafe-with-plants-outdoor-seating.jpg", "/organic-healthy-food-bowl.jpg"],
-    vibe: ["Green/Nature", "Quiet & Peaceful", "Aesthetic & Instagrammable"],
+    vibe: ["Green & Serene", "Quiet & Peaceful", "Aesthetic & Photogenic"],
     purpose: ["Hangout with Friends", "Family Outing"],
     amenities: ["Outdoor Seating", "Pet-Friendly", "Free Wi-Fi","Charging Ports"],
     bestDish: "Avocado Toast & Green Smoothie",
@@ -184,13 +184,13 @@ export const cafes: Cafe[] = [
     reviewCount: 421,
     image: "/modern-study-cafe-with-laptops.jpg",
     images: ["/modern-study-cafe-with-laptops.jpg"],
-    vibe: ["Quiet & Peaceful", "Modern/Trendy", "Aesthetic & Instagrammable"],
-    purpose: ["Work / Study Alone", "Business / Professional"],
+    vibe: ["Quiet & Peaceful", "Modern & Energetic", "Aesthetic & Photogenic"],
+    purpose: ["Me-Time & Relax", "Work & Unwind"],
     amenities: ["Free Wi-Fi", "Charging Ports"],
     bestDish: "Cappuccino & Sandwich",
     priceRange: "Budget Friendly – under ₹300",
     pricePerPerson: 180,
-    foodDrinkTypes: ["Coffee & Beverages", "All-rounder Menu", "Desserts & Bakery", "Breakfast & Brunch", "Fine Dining", "Alcoholic Drinks"],
+    foodDrinkTypes: ["Coffee & Beverages", "Global Café Bites", "Desserts & Bakery", "Breakfast & Brunch", "Indian & Comfort Meals", "Cocktails & Spirits"],
     menuCategories: [
       {
         name: "Coffee & Beverages",
@@ -200,7 +200,7 @@ export const cafes: Cafe[] = [
         ],
       },
       {
-        name: "All-rounder Menu",
+        name: "Global Café Bites",
         items: [
           { name: "Veg Sandwich", price: 120, dietaryType: "veg" },
           { name: "Pasta", price: 150, dietaryType: "veg" },
@@ -227,22 +227,22 @@ export const cafes: Cafe[] = [
     id: "5",
     name: "Romantic Rendezvous",
     
-    description: "Intimate setting with dim lighting, soft music, and a curated menu perfect for romantic dates.",
+    description: "Intimate setting with dim lighting, soft music, and a curated menu perfect for Date & Dines.",
     shortDescription: "Intimate dining for couples",
     rating: 4.9,
     reviewCount: 198,
     image: "/romantic-restaurant-dim-lighting-candles.jpg",
     images: ["/romantic-restaurant-dim-lighting-candles.jpg", "/fine-dining-plated-food.jpg"],
-    vibe: ["Quiet & Peaceful", "Aesthetic & Instagrammable", "Modern/Trendy"],
-    purpose: ["Romantic Date", "Fun Night Out"],
+    vibe: ["Quiet & Peaceful", "Aesthetic & Photogenic", "Modern & Energetic"],
+    purpose: ["Date & Dine", "Music & Night Out"],
     amenities: ["Parking", "Outdoor Seating", "Free Wi-Fi"],
     bestDish: "Lobster Thermidor & Red Wine",
     priceRange: "Premium – ₹900+",
     pricePerPerson: 1200,
-    foodDrinkTypes: ["Fine Dining", "Alcoholic Drinks", "Desserts & Bakery"],
+    foodDrinkTypes: ["Indian & Comfort Meals", "Cocktails & Spirits", "Desserts & Bakery"],
     menuCategories: [
       {
-        name: "Fine Dining",
+        name: "Indian & Comfort Meals",
         items: [
           { name: "Lobster Thermidor", price: 1800, dietaryType: "non-veg" },
           { name: "Filet Mignon", price: 1500, dietaryType: "non-veg" },
@@ -250,7 +250,7 @@ export const cafes: Cafe[] = [
         ],
       },
       {
-        name: "Alcoholic Drinks",
+        name: "Cocktails & Spirits",
         items: [
           { name: "Red Wine", price: 600, dietaryType: "veg" },
           { name: "Champagne", price: 1200, dietaryType: "veg" },
@@ -284,16 +284,16 @@ export const cafes: Cafe[] = [
     reviewCount: 512,
     image: "/family-restaurant-spacious-bright.jpg",
     images: ["/family-restaurant-spacious-bright.jpg"],
-    vibe: ["Modern/Trendy", "Green/Nature", "Quiet & Peaceful"],
+    vibe: ["Modern & Energetic", "Green & Serene", "Quiet & Peaceful"],
     purpose: ["Family Outing", "Hangout with Friends"],
     amenities: ["Parking", "Outdoor Seating", "Pet-Friendly"],
     bestDish: "Paneer Tikka & Mango Lassi",
     priceRange: "Moderate – ₹300–₹600",
     pricePerPerson: 450,
-    foodDrinkTypes: ["All-rounder Menu", "Coffee & Beverages", "Desserts & Bakery", "Breakfast & Brunch"],
+    foodDrinkTypes: ["Global Café Bites", "Coffee & Beverages", "Desserts & Bakery", "Breakfast & Brunch"],
     menuCategories: [
       {
-        name: "All-rounder Menu",
+        name: "Global Café Bites",
         items: [
           { name: "Paneer Tikka", price: 320, dietaryType: "veg" },
           { name: "Veg Biryani", price: 280, dietaryType: "veg" },
@@ -334,13 +334,13 @@ export const cafes: Cafe[] = [
     reviewCount: 234,
     image: "/modern-business-cafe-professional.jpg",
     images: ["/modern-business-cafe-professional.jpg"],
-    vibe: ["Modern/Trendy", "Quiet & Peaceful", "Aesthetic & Instagrammable"],
-    purpose: ["Business / Professional", "Work / Study Alone"],
+    vibe: ["Modern & Energetic", "Quiet & Peaceful", "Aesthetic & Photogenic"],
+    purpose: ["Work & Unwind", "Me-Time & Relax"],
     amenities: ["Free Wi-Fi", "Charging Ports", "Parking"],
     bestDish: "Espresso & Club Sandwich",
     priceRange: "Mid-Range – ₹600–₹900",
     pricePerPerson: 500,
-    foodDrinkTypes: ["Coffee & Beverages", "All-rounder Menu"],
+    foodDrinkTypes: ["Coffee & Beverages", "Global Café Bites"],
     menuCategories: [
       {
         name: "Coffee & Beverages",
@@ -350,7 +350,7 @@ export const cafes: Cafe[] = [
         ],
       },
       {
-        name: "All-rounder Menu",
+        name: "Global Café Bites",
         items: [
           { name: "Club Sandwich", price: 280, dietaryType: "non-veg" },
           { name: "Caesar Wrap", price: 250, dietaryType: "non-veg" },
@@ -384,23 +384,23 @@ export const cafes: Cafe[] = [
     reviewCount: 678,
     image: "/nightclub-lounge-bar-neon-lights.jpg",
     images: ["/nightclub-lounge-bar-neon-lights.jpg", "/cocktails-bar-drinks.jpg"],
-    vibe: ["Music & Live Events", "Modern/Trendy", "Rooftop/Open-air"],
-    purpose: ["Fun Night Out", "Hangout with Friends"],
+    vibe: ["Musical & Lively", "Modern & Energetic", "Rooftop & Breezy"],
+    purpose: ["Music & Night Out", "Hangout with Friends"],
     amenities: ["Parking", "Outdoor Seating", "Free Wi-Fi"],
     bestDish: "Chicken Wings & Cocktails",
     priceRange: "Premium – ₹900+",
     pricePerPerson: 900,
-    foodDrinkTypes: ["All-rounder Menu", "Alcoholic Drinks"],
+    foodDrinkTypes: ["Global Café Bites", "Cocktails & Spirits"],
     menuCategories: [
       {
-        name: "All-rounder Menu",
+        name: "Global Café Bites",
         items: [
           { name: "Chicken Wings", price: 380, dietaryType: "non-veg" },
           { name: "Nachos", price: 320, dietaryType: "veg" },
         ],
       },
       {
-        name: "Alcoholic Drinks",
+        name: "Cocktails & Spirits",
         items: [
           { name: "Signature Cocktail", price: 450, dietaryType: "veg" },
           { name: "Whiskey", price: 500, dietaryType: "veg" },
@@ -438,16 +438,16 @@ export const cafes: Cafe[] = [
     reviewCount: 198,
     image: "/romantic-restaurant-dim-lighting-candles.jpg",
     images: ["/romantic-restaurant-dim-lighting-candles.jpg", "/fine-dining-plated-food.jpg"],
-    vibe: ["Quiet & Peaceful", "Aesthetic & Instagrammable", "Modern/Trendy"],
-    purpose: ["Romantic Date", "Fun Night Out"],
+    vibe: ["Quiet & Peaceful", "Aesthetic & Photogenic", "Modern & Energetic"],
+    purpose: ["Date & Dine", "Music & Night Out"],
     amenities: ["Parking", "Outdoor Seating", "Free Wi-Fi"],
     bestDish: "Lobster Thermidor & Red Wine",
     priceRange: "Budget Friendly – under ₹300",
     pricePerPerson: 1200,
-    foodDrinkTypes: ["Fine Dining", "Alcoholic Drinks", "Desserts & Bakery"],
+    foodDrinkTypes: ["Indian & Comfort Meals", "Cocktails & Spirits", "Desserts & Bakery"],
     menuCategories: [
       {
-        name: "Fine Dining",
+        name: "Indian & Comfort Meals",
         items: [
           { name: "Lobster Thermidor", price: 1800, dietaryType: "non-veg" },
           { name: "Filet Mignon", price: 1500, dietaryType: "non-veg" },
@@ -455,7 +455,7 @@ export const cafes: Cafe[] = [
         ],
       },
       {
-        name: "Alcoholic Drinks",
+        name: "Cocktails & Spirits",
         items: [
           { name: "Red Wine", price: 600, dietaryType: "veg" },
           { name: "Champagne", price: 1200, dietaryType: "veg" },

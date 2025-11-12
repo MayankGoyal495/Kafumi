@@ -203,21 +203,21 @@ export default function SubmitCafePage() {
   };
 
   const purposeOptions = [
-    'Business / Professional',
+    'Work & Unwind',
     'Family Outing',
-    'Fun Night Out',
+    'Music & Night Out',
     'Hangout with Friends',
-    'Romantic Date',
-    'Work / Study Alone',
+    'Date & Dine',
+    'Me-Time & Relax',
   ];
 
   const ambienceOptions = [
-    'Aesthetic & Instagrammable',
-    'Green/Nature',
-    'Modern/Trendy',
-    'Music & Live Events',
+    'Aesthetic & Photogenic',
+    'Green & Serene',
+    'Modern & Energetic',
+    'Musical & Lively',
     'Quiet & Peaceful',
-    'Rooftop/Open-air',
+    'Rooftop & Breezy',
   ];
 
   const amenitiesOptions = [
@@ -233,9 +233,9 @@ export default function SubmitCafePage() {
     'Breakfast & Brunch',
     'Coffee & Beverages',
     'Desserts & Bakery',
-    'Alcoholic Drinks',
-    'All-rounder Menu',
-    'Fine Dining',
+    'Cocktails & Spirits',
+    'Global Café Bites',
+    'Indian & Comfort Meals',
   ];
 
   const toggleSelection = (array: string[], setter: (arr: string[]) => void, value: string, max?: number) => {

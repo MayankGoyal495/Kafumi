@@ -59,21 +59,21 @@ function BrowseContent() {
   const [sortBy, setSortBy] = useState<string>("name")
 
   const vibeOptions = [
-    "Aesthetic & Instagrammable",
-    "Green/Nature",
-    "Modern/Trendy",
-    "Music & Live Events",
+    "Aesthetic & Photogenic",
+    "Green & Serene",
+    "Modern & Energetic",
+    "Musical & Lively",
     "Quiet & Peaceful",
-    "Rooftop/Open-air",
+    "Rooftop & Breezy",
   ]
 
   const purposeOptions = [
-    "Business / Professional",
+    "Work & Unwind",
     "Family Outing",
-    "Fun Night Out",
+    "Music & Night Out",
     "Hangout with Friends",
-    "Romantic Date",
-    "Work / Study Alone",
+    "Date & Dine",
+    "Me-Time & Relax",
   ]
 
   const amenityOptions = [
@@ -82,6 +82,7 @@ function BrowseContent() {
     "Outdoor Seating",
     "Parking",
     "Pet-Friendly",
+    "Pure Vegetarian",
   ]
 
   const priceRangeOptions = ["Budget Friendly – under ₹300", "Moderate – ₹300–₹600", "Mid-Range – ₹600–₹900", "Premium – ₹900+"]
@@ -92,9 +93,9 @@ function BrowseContent() {
     "Breakfast & Brunch",
     "Coffee & Beverages", 
     "Desserts & Bakery",
-    "Alcoholic Drinks",
-    "Fine Dining",
-    "All-rounder Menu",
+    "Cocktails & Spirits",
+    "Indian & Comfort Meals",
+    "Global Café Bites",
   ]
 
   const distanceOptions = [
