@@ -3,10 +3,22 @@
 import { Header } from "@/components/header"
 import { Navigation } from "@/components/navigation"
 import { Heart, Filter, Coffee, Users, MapPin, Star } from "@/components/icons"
+import Script from "next/script"
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-background">
+      <Script
+        src="https://www.googletagmanager.com/gtag/js?id=G-CPRYZJF7WD"
+        strategy="afterInteractive"
+      />
+      <Script id="gtag-init" strategy="afterInteractive">
+        {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);} 
+gtag('js', new Date());
+
+gtag('config', 'G-CPRYZJF7WD');`}
+      </Script>
       <Header />
       <Navigation />
 
