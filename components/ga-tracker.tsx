@@ -1,7 +1,7 @@
 "use client"
 
 import { usePathname, useSearchParams } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, Suspense } from "react"
 
 declare global {
   interface Window {
@@ -9,7 +9,7 @@ declare global {
   }
 }
 
-export default function GATracker() {
+function GATrackerInner() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
@@ -25,4 +25,12 @@ export default function GATracker() {
   }, [pathname, searchParams])
 
   return null
+}
+
+export default function GATracker() {
+  return (
+    <Suspense fallback={null}>
+      <GATrackerInner />
+    </Suspense>
+  )
 }
