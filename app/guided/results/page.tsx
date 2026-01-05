@@ -26,6 +26,8 @@ export default function GuidedResultsPage() {
   const [favorites, setFavorites] = useState<string[]>([])
   const [location, setLocation] = useState("Bangalore")
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [mandatoryFilters, setMandatoryFilters] = useState<{[key: string]: string | string[]}>({})
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const initData = async () => {
@@ -44,9 +46,12 @@ export default function GuidedResultsPage() {
 
       // In a real app, would filter based on preferences
       const preferences = localStorage.getItem("guidedSearchPreferences")
+      const mandatoryFlagsStr = localStorage.getItem("mandatoryFlags")
       const savedCoords = localStorage.getItem("userCoords")
       if (preferences) {
         const parsed = JSON.parse(preferences)
+        const mandatoryFlags = mandatoryFlagsStr ? JSON.parse(mandatoryFlagsStr) : {}
+        
         const userPrefs: UserMatchPreferences = {
           preferredMood: parsed[1] || "",
           preferredAmbience: parsed[2] || [],
@@ -58,14 +63,36 @@ export default function GuidedResultsPage() {
           maxDistance: parsed[5] || "Anywhere 12km+",
           minRating: 0,
           userCoords: savedCoords ? JSON.parse(savedCoords) : undefined,
+          // Mandatory flags
+          purposeMandatory: mandatoryFlags[1] || false,
+          ambienceMandatory: mandatoryFlags[2] || false,
+          amenitiesMandatory: mandatoryFlags[3] || false,
+          foodDrinksMandatory: mandatoryFlags[4] || false,
+          distanceMandatory: mandatoryFlags[5] || false,
+          priceMandatory: mandatoryFlags[6] || false,
         }
+        
+        // Store mandatory filters for display
+        const mandatory: {[key: string]: string | string[]} = {}
+        if (mandatoryFlags[1] && parsed[1]) mandatory['Purpose'] = parsed[1]
+        if (mandatoryFlags[2] && parsed[2]?.length) mandatory['Ambience'] = parsed[2]
+        if (mandatoryFlags[3] && parsed[3]?.length) mandatory['Amenities'] = parsed[3]
+        if (mandatoryFlags[4] && parsed[4]?.length) mandatory['Food & Drinks'] = parsed[4]
+        if (mandatoryFlags[5] && parsed[5]) mandatory['Distance'] = parsed[5]
+        if (mandatoryFlags[6] && parsed[6]) mandatory['Price'] = parsed[6]
+        setMandatoryFilters(mandatory)
         computeCafeMatches(userPrefs).then((results) => {
-          // Merge match % into cafe cards by ordering cafe list accordingly
-          const ordered = [...cafes].sort((a, b) => {
+          // Only include cafes that are in the results (passed mandatory filters)
+          const resultNames = new Set(results.map(r => r.name))
+          const matchedCafes = cafes.filter(cafe => resultNames.has(cafe.name))
+          
+          // Sort by match percentage
+          const ordered = matchedCafes.sort((a, b) => {
             const aScore = results.find((r) => r.name === a.name)?.matchPercentage ?? 0
             const bScore = results.find((r) => r.name === b.name)?.matchPercentage ?? 0
             return bScore - aScore
           })
+          
           setMatchesCount(results.length)
           setMatchMap(Object.fromEntries(results.map((r) => [r.name, r.matchPercentage])))
           setFeaturesMap(
@@ -74,9 +101,11 @@ export default function GuidedResultsPage() {
             ),
           )
           setRecommendedCafes(ordered)
+          setIsLoading(false)
         })
       } else {
         setRecommendedCafes(cafes)
+        setIsLoading(false)
       }
     }
     initData()
@@ -98,8 +127,8 @@ export default function GuidedResultsPage() {
   const topThreeCafes = recommendedCafes.slice(1, 4)
   const moreCafes = recommendedCafes.slice(4, 8)
 
-  // Show loading state while cafes are being fetched
-  if (recommendedCafes.length === 0) {
+  // Show loading state while cafes are being fetched and filtered
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -139,9 +168,14 @@ export default function GuidedResultsPage() {
               <Sparkles className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground">We Found Perfect Matches for You! ✨</h1>
+              <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
+                {recommendedCafes.length > 0 ? 'We Found Perfect Matches for You! ✨' : 'No Cafés Found 😔'}
+              </h1>
               <p className="text-muted-foreground mt-2 text-lg">
-                Based on your preferences, we found {matchesCount || recommendedCafes.length} amazing cafés
+                {recommendedCafes.length > 0 
+                  ? `Based on your preferences, we found ${matchesCount || recommendedCafes.length} amazing cafés`
+                  : 'No cafés match your mandatory requirements. Try adjusting your filters.'
+                }
               </p>
             </div>
             <Button variant="outline" onClick={handleRedoSearch} className="gap-2 bg-transparent">
@@ -149,6 +183,41 @@ export default function GuidedResultsPage() {
               Try Different Preferences
             </Button>
           </div>
+
+          {/* Mandatory Filters Info */}
+          {Object.keys(mandatoryFilters).length > 0 && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="pt-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-lg">🔒</span>
+                    </div>
+                    <h3 className="font-semibold text-foreground">
+                      Mandatory Requirements Applied {recommendedCafes.length === 0 && '(Too Restrictive?)'}
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-10">
+                    {Object.entries(mandatoryFilters).map(([key, value]) => (
+                      <div key={key} className="text-sm">
+                        <span className="font-medium text-foreground">{key}:</span>{' '}
+                        <span className="text-muted-foreground">
+                          {Array.isArray(value) ? value.join(', ') : value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {recommendedCafes.length === 0 && (
+                    <div className="pt-3 border-t border-primary/20">
+                      <p className="text-sm text-muted-foreground">
+                        💡 <strong>Tip:</strong> Try making some filters optional to see more results, or adjust your distance/price requirements.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Featured Café - Full Width Banner */}
           {featuredCafe && (

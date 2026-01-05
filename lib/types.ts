@@ -1,3 +1,21 @@
+// Food & Drink Category Types
+export type FoodDrinkCategory = 
+  | "Breakfast & Brunch"
+  | "Coffee & Beverages"
+  | "Desserts & Bakery"
+  | "Cocktails & Spirits";
+
+export type CuisineType = 
+  | "Indian"
+  | "Italian"
+  | "Mexican"
+  | "Pan-Asian"
+  | "Continental"
+  | "Middle Eastern"
+  | "Global";
+
+export type FoodDrinkType = FoodDrinkCategory | CuisineType;
+
 export interface Cafe {
   id: string
   name: string
@@ -15,7 +33,7 @@ export interface Cafe {
   bestDish: string
   priceRange: string
   pricePerPerson: number
-  foodDrinkTypes?: string[]
+  foodDrinkTypes?: FoodDrinkType[]
   menuCategories: {
     name: string
     items: { name: string; price: number; description?: string; dietaryType?: "veg" | "non-veg" | "egg" }[]
@@ -46,7 +64,7 @@ export interface UserPreferences {
   purpose?: string
   ambience?: string[]
   amenities?: string[]
-  foodDrinks?: string[]
+  foodDrinkTypes?: FoodDrinkType[]
   distance?: string
   priceRange?: string
 }

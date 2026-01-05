@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     console.log('=== Submit Cafe API Called ===');
     const formData = await request.formData();
-    
+
     // Extract form fields
     const cafeData = {
       cafeName: formData.get('cafeName') as string,
@@ -40,11 +40,11 @@ export async function POST(request: NextRequest) {
     // Handle file uploads
     const coverImage = formData.get('coverImage') as File;
     const photos = formData.getAll('photos') as File[];
-    const menuFile = formData.get('menuFile') as File;
+    const menuFiles = formData.getAll('menuFile') as File[];
 
     let coverImageLink = '';
     const photoLinks: string[] = [];
-    let menuFileLink = '';
+    const menuFileLinks: string[] = [];
 
     // Upload cover image
     if (coverImage) {
@@ -70,15 +70,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Upload menu file if provided
-    if (menuFile && menuFile.size > 0) {
-      const buffer = Buffer.from(await menuFile.arrayBuffer());
-      const result = await uploadToDrive(
-        buffer,
-        `menu_${Date.now()}_${menuFile.name}`,
-        menuFile.type
-      );
-      menuFileLink = result.link || '';
+    // Upload menu files if provided
+    for (const menuFile of menuFiles) {
+      if (menuFile && menuFile.size > 0) {
+        const buffer = Buffer.from(await menuFile.arrayBuffer());
+        const result = await uploadToDrive(
+          buffer,
+          `menu_${Date.now()}_${menuFile.name}`,
+          menuFile.type
+        );
+        menuFileLinks.push(result.link || '');
+      }
     }
 
     // Prepare row data for Google Sheets
@@ -108,7 +110,7 @@ export async function POST(request: NextRequest) {
       cafeData.best3Dishes,
       coverImageLink,
       photoLinks.join('||'), // Separate links with ||
-      menuFileLink,
+      menuFileLinks.join('||'),
       cafeData.consent,
       new Date().toISOString(), // Submission date
       '', // Rating (admin fills)
@@ -124,7 +126,7 @@ export async function POST(request: NextRequest) {
     console.log('Sheet ID:', process.env.GOOGLE_SHEET_ID);
     console.log('Service Account Email:', process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
     console.log('Row data length:', rowData.length);
-    
+
     const sheetResult = await appendToSheet([rowData]);
     console.log('=== Successfully appended to sheet ===', sheetResult);
 

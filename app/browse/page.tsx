@@ -61,10 +61,10 @@ function BrowseContent() {
   const vibeOptions = [
     "Aesthetic & Photogenic",
     "Green & Serene",
-    "Modern & Energetic",
-    "Musical & Lively",
+    "Nightlife & Dancing",
+    "Musical & Soulful",
     "Quiet & Peaceful",
-    "Rooftop & Breezy",
+    "Rooftop & Outdoor",
   ]
 
   const purposeOptions = [
@@ -79,10 +79,10 @@ function BrowseContent() {
   const amenityOptions = [
     "Charging Ports",
     "Free Wi-Fi",
-    "Outdoor Seating",
+    "Games",
     "Parking",
     "Pet-Friendly",
-    "Pure Vegetarian",
+    "Smoking Area",
   ]
 
   const priceRangeOptions = ["Budget Friendly – under ₹300", "Moderate – ₹300–₹600", "Mid-Range – ₹600–₹900", "Premium – ₹900+"]
@@ -94,8 +94,13 @@ function BrowseContent() {
     "Coffee & Beverages", 
     "Desserts & Bakery",
     "Cocktails & Spirits",
-    "Indian & Comfort Meals",
-    "Global Café Bites",
+    "Indian",
+    "Italian",
+    "Mexican",
+    "Pan-Asian",
+    "Continental",
+    "Middle Eastern",
+    "Global",
   ]
 
   const distanceOptions = [

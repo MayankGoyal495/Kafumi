@@ -2,9 +2,11 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter, Playfair_Display } from "next/font/google"
 import { Suspense } from "react"
+import Script from "next/script"
 import "./globals.css"
-import { ClientAuthProvider } from "@/src/components/ClientAuthProvider"
+import { AuthProvider } from "@/lib/auth-context"
 import { ErrorBoundary } from "@/components/error-boundary"
+import GATracker from "@/components/ga-tracker"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -32,10 +34,22 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${inter.variable} ${playfair.variable} antialiased`}>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-CPRYZJF7WD"
+          strategy="afterInteractive"
+        />
+        <Script id="gtag-init" strategy="afterInteractive">
+          {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);} 
+gtag('js', new Date());
+
+gtag('config', 'G-CPRYZJF7WD');`}
+        </Script>
         <ErrorBoundary>
-          <ClientAuthProvider>
+          <GATracker />
+          <AuthProvider>
             <Suspense fallback={null}>{children}</Suspense>
-          </ClientAuthProvider>
+          </AuthProvider>
         </ErrorBoundary>
       </body>
     </html>

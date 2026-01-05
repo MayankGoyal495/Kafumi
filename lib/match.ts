@@ -19,6 +19,13 @@ export interface UserMatchPreferences {
   maxDistance: DistanceBucket
   minRating: number
   userCoords?: { lat: number; lng: number }
+  // Mandatory flags for each filter
+  purposeMandatory?: boolean
+  ambienceMandatory?: boolean
+  amenitiesMandatory?: boolean
+  foodDrinksMandatory?: boolean
+  distanceMandatory?: boolean
+  priceMandatory?: boolean
 }
 
 const distanceBuckets: { label: DistanceBucket; maxKm: number | null }[] = [
@@ -74,12 +81,59 @@ export interface MatchResultItem {
  * - Dishes: 12%
  * - Rating: 11%
  * - Promoter Rating: 13%
+ * 
+ * Two-stage filtering:
+ * 1. MANDATORY filters eliminate cafes (hard requirements)
+ * 2. OPTIONAL filters contribute to match percentage scoring
  */
 export async function computeCafeMatches(preferences: UserMatchPreferences): Promise<MatchResultItem[]> {
-  const cafes = await getCafes()
+  let cafes = await getCafes() as Cafe[]
   const results: MatchResultItem[] = []
 
-  for (const cafe of cafes as Cafe[]) {
+  // ============================================================================
+  // STAGE 1: MANDATORY FILTERS (Eliminate cafes that don't meet requirements)
+  // ============================================================================
+
+  // Purpose (Single select - must match exactly)
+  if (preferences.purposeMandatory && preferences.preferredMood) {
+    cafes = cafes.filter(cafe => cafe.purpose?.includes(preferences.preferredMood))
+  }
+
+  // Ambience (OR logic - must match ANY selected)
+  if (preferences.ambienceMandatory && preferences.preferredAmbience?.length > 0) {
+    cafes = cafes.filter(cafe => 
+      preferences.preferredAmbience.some(amb => cafe.vibe.includes(amb))
+    )
+  }
+
+  // Amenities (AND logic - must have ALL selected)
+  if (preferences.amenitiesMandatory && preferences.preferredAmenities?.length > 0) {
+    cafes = cafes.filter(cafe => 
+      preferences.preferredAmenities.every(amen => cafe.amenities.includes(amen))
+    )
+  }
+
+  // Food & Drinks (OR logic - must have ANY selected)
+  if (preferences.foodDrinksMandatory && preferences.preferredFoodDrinkTypes?.length > 0) {
+    cafes = cafes.filter(cafe => {
+      const cafeFdt = cafe.foodDrinkTypes ?? []
+      return preferences.preferredFoodDrinkTypes.some(fdt => cafeFdt.includes(fdt))
+    })
+  }
+
+  // Price (Single select - must match exactly)
+  if (preferences.priceMandatory && preferences.preferredPriceRange) {
+    cafes = cafes.filter(cafe => cafe.priceRange === preferences.preferredPriceRange)
+  }
+
+  // Distance (Will be filtered below with accurate distance calculation)
+  // We'll handle this separately since it requires async distance API calls
+
+  // ============================================================================
+  // STAGE 2: SCORING (Calculate match % on remaining cafes)
+  // ============================================================================
+
+  for (const cafe of cafes) {
     // Rating exclusion
     if (typeof preferences.minRating === "number" && cafe.rating < preferences.minRating) {
       continue
@@ -137,25 +191,43 @@ export async function computeCafeMatches(preferences: UserMatchPreferences): Pro
       total += (cafe.promoterRating / 10) * 13
     }
     
-    // Distance is not in the new weights, but we still calculate it for display
+    // Distance calculation and mandatory filtering
     let distanceLabel = "N/A"
     let distanceProximity: 'within' | 'next' | 'beyond' | 'unknown' = 'unknown'
+    let skipCafe = false
+    
     if (preferences.userCoords) {
       try {
         const km = await getDistanceKm(preferences.userCoords, cafe.location.coordinates)
         distanceLabel = formatKm(km)
+        
         const userBucketIdx = bucketIndex(
           distanceBuckets.map((b) => b.label),
           preferences.maxDistance,
         )
         const cafeBucketIdx = getDistanceBucketIndex(km)
+        
         if (cafeBucketIdx <= userBucketIdx) { distanceProximity = 'within' }
         else if (cafeBucketIdx === userBucketIdx + 1) { distanceProximity = 'next' }
         else { distanceProximity = 'beyond' }
+        
+        // MANDATORY DISTANCE CHECK: Skip cafe if beyond max distance
+        if (preferences.distanceMandatory && preferences.maxDistance) {
+          const maxKm = distanceBuckets[userBucketIdx].maxKm
+          if (maxKm !== null && km > maxKm) {
+            skipCafe = true
+          }
+        }
       } catch {
-        // ignore
+        // If distance calculation fails and distance is mandatory, skip cafe
+        if (preferences.distanceMandatory) {
+          skipCafe = true
+        }
       }
     }
+    
+    // Skip cafe if it failed mandatory distance check
+    if (skipCafe) continue
 
     // Clamp and push
     const matchPercentage = Math.max(0, Math.min(100, Math.round(total)))

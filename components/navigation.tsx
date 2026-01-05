@@ -2,19 +2,19 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Search, Heart, Info, User } from "@/components/icons"
-import { useClientAuth } from "@/src/hooks/useClientAuth"
+import { Home, Search, Heart, Info, User } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
 
 export function Navigation() {
   const pathname = usePathname()
-  const { user } = useClientAuth()
+  const { user } = useAuth()
 
   const navItems = [
     { href: "/home", label: "Explore", icon: Home },
     { href: "/browse", label: "Browse", icon: Search },
     { href: "/favorites", label: "Favourites", icon: Heart },
     { href: "/about", label: "About", icon: Info },
-    { href: user ? "/profile" : "/", label: user ? "Profile" : "Login", icon: User },
+    { href: user ? "/profile" : "/auth", label: user ? "Profile" : "Login", icon: User },
   ]
 
   return (

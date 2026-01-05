@@ -29,6 +29,7 @@ import {
 import { VegMark, NonVegMark, EggMark } from "@/components/icons"
 import { formatKm } from "@/lib/geocoding"
 import { getDistanceKm } from "@/lib/distance"
+import { FeedbackSection } from "@/components/feedback-section"
 
 export default function CafeDetailPage() {
   const router = useRouter()
@@ -299,7 +300,7 @@ export default function CafeDetailPage() {
                 Vibe
               </TabsTrigger>
               <TabsTrigger value="photos" className="text-xs md:text-sm py-2.5">
-                Photos
+                Photos & Reviews
               </TabsTrigger>
               <TabsTrigger value="contact" className="text-xs md:text-sm py-2.5">
                 Contact
@@ -411,50 +412,57 @@ export default function CafeDetailPage() {
               </Card>
             </TabsContent>
 
-            {/* Photos Tab (replacing Reviews) */}
-            <TabsContent value="photos" className="space-y-4 mt-6">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                {cafe.images.length > 0 ? cafe.images.map((image, index) => {
-                  const hasError = imageErrors.has(index);
-                  let imageSrc = (hasError || !image || image.trim() === '' || image.includes('placeholder')) 
-                    ? '/placeholder.jpg' 
-                    : image;
-                  
-                  // Use proxy for Google Drive URLs
-                  if (imageSrc.includes('drive.google.com') && imageSrc !== '/placeholder.jpg') {
-                    imageSrc = `/api/proxy-image?url=${encodeURIComponent(imageSrc)}`;
-                  }
-                  
-                  return (
-                    <div
-                      key={index}
-                      className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity bg-muted"
-                      onClick={() => setCurrentImageIndex(index)}
-                    >
+            {/* Photos & Reviews Tab */}
+            <TabsContent value="photos" className="space-y-6 mt-6">
+              {/* Photos Gallery */}
+              <div>
+                <h3 className="text-2xl font-serif font-bold mb-4">Photos</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                  {cafe.images.length > 0 ? cafe.images.map((image, index) => {
+                    const hasError = imageErrors.has(index);
+                    let imageSrc = (hasError || !image || image.trim() === '' || image.includes('placeholder')) 
+                      ? '/placeholder.jpg' 
+                      : image;
+                    
+                    // Use proxy for Google Drive URLs
+                    if (imageSrc.includes('drive.google.com') && imageSrc !== '/placeholder.jpg') {
+                      imageSrc = `/api/proxy-image?url=${encodeURIComponent(imageSrc)}`;
+                    }
+                    
+                    return (
+                      <div
+                        key={index}
+                        className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity bg-muted"
+                        onClick={() => setCurrentImageIndex(index)}
+                      >
+                        <img
+                          src={imageSrc}
+                          alt={`${cafe.name} photo ${index + 1}`}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            if (e.currentTarget.src !== window.location.origin + '/placeholder.jpg') {
+                              e.currentTarget.src = '/placeholder.jpg';
+                              setImageErrors(prev => new Set(prev).add(index));
+                            }
+                          }}
+                        />
+                      </div>
+                    );
+                  }) : (
+                    <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
                       <img
-                        src={imageSrc}
-                        alt={`${cafe.name} photo ${index + 1}`}
+                        src="/placeholder.jpg"
+                        alt={`${cafe.name} placeholder`}
                         className="absolute inset-0 w-full h-full object-cover"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => {
-                          if (e.currentTarget.src !== window.location.origin + '/placeholder.jpg') {
-                            e.currentTarget.src = '/placeholder.jpg';
-                            setImageErrors(prev => new Set(prev).add(index));
-                          }
-                        }}
                       />
                     </div>
-                  );
-                }) : (
-                  <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-                    <img
-                      src="/placeholder.jpg"
-                      alt={`${cafe.name} placeholder`}
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
+
+              {/* Reviews Section */}
+              <FeedbackSection cafeId={cafe.id} cafeName={cafe.name} />
             </TabsContent>
 
             {/* Contact Tab */}

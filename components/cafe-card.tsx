@@ -2,14 +2,15 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Star, MapPin, Heart, VegMark } from "@/components/icons"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import type { Cafe } from "@/lib/types"
 import { formatKm } from "@/lib/geocoding"
 import { getDistanceKm } from "@/lib/distance"
-import { useClientAuth } from "@/src/hooks/useClientAuth"
-import { CardLoading } from "./loading"
+import { useAuth } from "@/lib/auth-context"
+import { favoritesService } from "@/lib/favorites-service"
 
 interface CafeCardProps {
   cafe: Cafe
@@ -18,26 +19,15 @@ interface CafeCardProps {
 }
 
 export function CafeCard({ cafe, onToggleFavorite, isFavorite = false }: CafeCardProps) {
-  const { user } = useClientAuth()
+  const router = useRouter()
+  const { user, userData, refreshUserData } = useAuth()
   const [distanceLabel, setDistanceLabel] = useState<string | null>(null)
-  const [localFavorites, setLocalFavorites] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [imageError, setImageError] = useState(false)
+  const [favoriteLoading, setFavoriteLoading] = useState(false)
   
-  // Load favorites from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('favorites')
-    if (saved) {
-      try {
-        setLocalFavorites(JSON.parse(saved))
-      } catch (error) {
-        console.error('Error parsing favorites:', error)
-      }
-    }
-  }, [])
-  
-  // Use local favorites
-  const isCafeFavorite = localFavorites.includes(cafe.id) || isFavorite
+  // Check if cafe is favorite
+  const isCafeFavorite = userData?.favorites?.includes(cafe.id) || isFavorite
 
   useEffect(() => {
     (async () => {
@@ -58,16 +48,37 @@ export function CafeCard({ cafe, onToggleFavorite, isFavorite = false }: CafeCar
     })()
   }, [cafe.location.coordinates])
 
-  const handleToggleFavorite = () => {
-    const newFavorites = localFavorites.includes(cafe.id)
-      ? localFavorites.filter(id => id !== cafe.id)
-      : [...localFavorites, cafe.id]
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
     
-    setLocalFavorites(newFavorites)
-    localStorage.setItem('favorites', JSON.stringify(newFavorites))
-    
-    if (onToggleFavorite) {
-      onToggleFavorite(cafe.id)
+    // Check if user is logged in
+    if (!user) {
+      router.push("/auth")
+      return
+    }
+
+    setFavoriteLoading(true)
+
+    try {
+      if (isCafeFavorite) {
+        // Remove from favorites
+        await favoritesService.removeFavorite(user.uid, cafe.id)
+      } else {
+        // Add to favorites
+        await favoritesService.addFavorite(user.uid, cafe.id)
+      }
+      
+      // Refresh user data to update UI
+      await refreshUserData()
+      
+      if (onToggleFavorite) {
+        onToggleFavorite(cafe.id)
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error)
+    } finally {
+      setFavoriteLoading(false)
     }
   }
 
@@ -80,19 +91,8 @@ export function CafeCard({ cafe, onToggleFavorite, isFavorite = false }: CafeCar
               ? '/placeholder.jpg'
               : cafe.image;
             
-            // If it's a Google Drive URL, use proxy endpoint for better reliability
             if (imageSrc.includes('drive.google.com') && imageSrc !== '/placeholder.jpg') {
               imageSrc = `/api/proxy-image?url=${encodeURIComponent(imageSrc)}`;
-            }
-            
-            // Debug: Log image URL for first cafe
-            if (cafe.id === 'cafe_1') {
-              console.log('Cafe Card Image Debug:', {
-                cafeName: cafe.name,
-                originalImage: cafe.image,
-                finalImageSrc: imageSrc,
-                hasError: imageError
-              });
             }
             
             return (
@@ -108,18 +108,10 @@ export function CafeCard({ cafe, onToggleFavorite, isFavorite = false }: CafeCar
                   objectFit: 'cover'
                 }}
                 loading="lazy"
-                onLoad={() => {
-                  // Image loaded successfully
-                  if (cafe.id === 'cafe_1') {
-                    console.log('Image loaded successfully:', imageSrc);
-                  }
-                }}
                 onError={(e) => {
-                  console.error('Image failed to load:', imageSrc, 'for cafe:', cafe.name);
                   const currentSrc = e.currentTarget.src;
                   const placeholderUrl = window.location.origin + '/placeholder.jpg';
                   
-                  // If it's not already the placeholder, try placeholder
                   if (!currentSrc.includes('placeholder.jpg') && currentSrc !== placeholderUrl) {
                     e.currentTarget.src = '/placeholder.jpg';
                     setImageError(true);
@@ -143,16 +135,21 @@ export function CafeCard({ cafe, onToggleFavorite, isFavorite = false }: CafeCar
               {cafe.name}
             </h3>
           </Link>
-          {(onToggleFavorite || user) && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleToggleFavorite}
-              className="h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 hover:scale-110 transition-transform"
-            >
-              <Heart className={`h-4 w-4 sm:h-5 sm:w-5 transition-all ${isCafeFavorite ? "fill-red-500 text-red-500" : "text-muted-foreground hover:text-red-400"}`} />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleToggleFavorite}
+            disabled={favoriteLoading}
+            className="h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 hover:scale-110 transition-transform"
+          >
+            <Heart 
+              className={`h-4 w-4 sm:h-5 sm:w-5 transition-all ${
+                isCafeFavorite 
+                  ? "fill-red-500 text-red-500" 
+                  : "text-muted-foreground hover:text-red-400"
+              }`} 
+            />
+          </Button>
         </div>
 
         <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-3 line-clamp-2 leading-relaxed">{cafe.shortDescription}</p>
@@ -163,12 +160,12 @@ export function CafeCard({ cafe, onToggleFavorite, isFavorite = false }: CafeCar
             <span className="font-bold text-yellow-900 text-xs sm:text-sm">{cafe.rating}</span>
             <span className="text-yellow-700 text-[10px] sm:text-xs">({cafe.reviewCount})</span>
           </div>
-              <div className="flex items-center gap-0.5 sm:gap-1 text-muted-foreground">
-                <MapPin className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="truncate text-[10px] sm:text-xs">
-                  {isLoading ? "..." : distanceLabel || ""}
-                </span>
-              </div>
+          <div className="flex items-center gap-0.5 sm:gap-1 text-muted-foreground">
+            <MapPin className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="truncate text-[10px] sm:text-xs">
+              {isLoading ? "..." : distanceLabel || ""}
+            </span>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-4">
