@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
     // Send email using Resend
     const { data, error } = await resend.emails.send({
-      from: 'Kafumi <onboarding@resend.dev>',
+      from: 'Kafumi <noreply@kafumi.com>',
       to: [email],
       subject: 'Your Kafumi Login OTP',
       html: `
