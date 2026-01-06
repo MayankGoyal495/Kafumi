@@ -134,19 +134,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Email OTP - Send
   const sendEmailOTP = async (email: string) => {
-    if (!db) return { success: false, error: "Database not initialized" }
+    console.log('🔵 [Auth Context] sendEmailOTP called for:', email)
+    
+    if (!db) {
+      console.error('❌ [Auth Context] Database not initialized')
+      return { success: false, error: "Database not initialized" }
+    }
     
     try {
       // Generate 6-digit OTP
       const otp = Math.floor(100000 + Math.random() * 900000).toString()
+      console.log('🔵 [Auth Context] Generated OTP:', otp)
       
       // Store OTP in Firestore temporarily (expires in 10 minutes)
       const otpRef = doc(db, "email_otps", email)
+      console.log('🔵 [Auth Context] Storing OTP in Firestore...')
+      
       await setDoc(otpRef, {
         otp,
         createdAt: serverTimestamp(),
         expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
       })
+      
+      console.log('✅ [Auth Context] OTP stored in Firestore')
+      console.log('🔵 [Auth Context] Calling email API...')
       
       // Send email via API route
       const response = await fetch('/api/send-email-otp', {
@@ -155,13 +166,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, otp })
       })
       
+      console.log('🔵 [Auth Context] API response status:', response.status)
+      
       if (!response.ok) {
-        throw new Error('Failed to send email')
+        const errorData = await response.json()
+        console.error('❌ [Auth Context] API error:', errorData)
+        throw new Error(errorData.error || 'Failed to send email')
       }
+      
+      const result = await response.json()
+      console.log('✅ [Auth Context] Email sent successfully:', result)
       
       return { success: true }
     } catch (error: any) {
-      console.error('Send email OTP error:', error)
+      console.error('❌ [Auth Context] Send email OTP error:', error)
       return { success: false, error: error.message }
     }
   }
